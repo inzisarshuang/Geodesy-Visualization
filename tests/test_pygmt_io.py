@@ -9,13 +9,21 @@ from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPOSITORY_ROOT))
 sys.path.insert(0, str(REPOSITORY_ROOT / "lib"))
 
-from pygmt_io import load_key_value_config, validate_config_keys
+import pygmt_io as legacy_io
+from geodesy_visualization.io import load_key_value_config, validate_config_keys
 
 
 class PlotConfigTests(unittest.TestCase):
+    def test_legacy_module_reexports_canonical_implementation(self) -> None:
+        """Keep existing imports working without maintaining duplicate behavior."""
+        self.assertIs(legacy_io.load_key_value_config, load_key_value_config)
+        self.assertIs(legacy_io.validate_config_keys, validate_config_keys)
+
     def write_config(self, text: str) -> Path:
+        """Write one temporary cfg used by a parser regression test."""
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         path = Path(directory.name) / "test.cfg"
@@ -23,6 +31,7 @@ class PlotConfigTests(unittest.TestCase):
         return path
 
     def test_preserves_hex_colors_and_expands_config_references(self) -> None:
+        """Preserve hexadecimal colors while expanding cfg references."""
         path = self.write_config(
             "output_dir = result\n"
             "output = ${output_dir}/map.png\n"
@@ -37,6 +46,7 @@ class PlotConfigTests(unittest.TestCase):
         self.assertEqual(cfg["pen"], "1p,#33147d")
 
     def test_rejects_duplicate_and_malformed_lines(self) -> None:
+        """Reject ambiguous duplicate keys and lines without a delimiter."""
         duplicate = self.write_config("key = one\nkey = two\n")
         with self.assertRaisesRegex(ValueError, "duplicate configuration key"):
             load_key_value_config(str(duplicate))
@@ -46,6 +56,7 @@ class PlotConfigTests(unittest.TestCase):
             load_key_value_config(str(malformed))
 
     def test_rejects_cycles_and_unknown_keys_with_suggestion(self) -> None:
+        """Report cyclic references and suggest corrections for unknown keys."""
         cyclic = self.write_config("first = ${second}\nsecond = ${first}\n")
         with self.assertRaisesRegex(ValueError, "cyclic configuration reference"):
             load_key_value_config(str(cyclic))

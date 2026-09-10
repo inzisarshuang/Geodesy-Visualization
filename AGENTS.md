@@ -5,8 +5,8 @@ This file defines the rules an AI coding agent or human contributor should read 
 ## Scope
 
 - Keep plotting workflows configuration-driven. Scientific paths, units, scales, color limits, transparency, and styles belong in cfg files, not hidden constants in entry scripts.
-- Reuse `lib/pygmt_io.py`, `lib/pygmt_geo.py`, and `lib/pygmt_visual.py` before adding helpers.
-- Keep configuration and file mechanics in `pygmt_io`, spatial conversion and sampling in `pygmt_geo`, and figure composition in `pygmt_visual`.
+- Reuse `geodesy_visualization/io.py`, `lib/pygmt_geo.py`, and `lib/pygmt_visual.py` before adding helpers. `lib/pygmt_io.py` is a compatibility import only.
+- Keep configuration and file mechanics in `geodesy_visualization.io`, spatial conversion and sampling in `pygmt_geo`, and figure composition in `pygmt_visual`.
 - Add domain, mask, or export modules only when the repository has independent behavior to own; do not create empty pipeline stages.
 - Add a shared function only when it removes real duplication or establishes one scientific behavior in one place.
 - Preserve existing cfg keys unless a migration path and compatibility alias are provided.
@@ -32,7 +32,7 @@ This file defines the rules an AI coding agent or human contributor should read 
 - Target Python 3.10 or newer and use type hints for public functions.
 - Use `pathlib.Path`, context managers, and `subprocess.run(..., check=True)`.
 - Raise actionable exceptions; do not use `assert` for runtime validation.
-- Start every new production Python file with the GAMMA-InSAR-style structured docstring containing the module name, `功能概述:`, and `函数说明:` sections. List every public top-level function and class, and update the list whenever an interface is added, removed, or renamed. The required template is in `docs/development/python_rules.md`.
+- Start every new production Python file with the GAMMA-InSAR-style structured docstring containing the module name, `功能概述:`, and `函数说明:` sections. This includes files under `geodesy_visualization/`. List every public top-level function and class, and update the list whenever an interface is added, removed, or renamed. The required template is in `docs/development/python_rules.md`.
 - Start every production function and method, including private helpers and entry-script orchestration, with a concise docstring that states its purpose. Public scientific APIs may add bilingual parameter and return details when useful.
 - Entry scripts should parse configuration, orchestrate shared functions, and remain thin.
 

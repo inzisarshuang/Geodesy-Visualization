@@ -25,10 +25,12 @@ import numpy as np
 import pandas as pd
 import pygmt
 
-LIB_DIR = Path(__file__).resolve().parents[1] / "lib"
-sys.path.append(str(LIB_DIR))
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+LIB_DIR = REPOSITORY_ROOT / "lib"
+sys.path.insert(0, str(REPOSITORY_ROOT))
+sys.path.insert(0, str(LIB_DIR))
 
-from pygmt_io import (
+from geodesy_visualization.io import (
     get_optional,
     get_required,
     load_key_value_config,

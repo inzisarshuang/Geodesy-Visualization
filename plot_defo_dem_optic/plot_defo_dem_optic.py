@@ -37,11 +37,13 @@ import sys
 from pathlib import Path
 import numpy as np
 
-lib_path = Path(__file__).resolve().parents[1] / "lib"
-sys.path.append(str(lib_path))
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+lib_path = REPOSITORY_ROOT / "lib"
+sys.path.insert(0, str(REPOSITORY_ROOT))
+sys.path.insert(0, str(lib_path))
 
 from pygmt_geo import prepare_dataset_grid, region_from_grd
-from pygmt_io import (
+from geodesy_visualization.io import (
     get_optional,
     get_required,
     load_key_value_config,

@@ -14,6 +14,9 @@ class ProductionDocstringTests(unittest.TestCase):
     def production_files(self) -> list[Path]:
         """Return every library and workflow module governed by documentation rules."""
         source_files = list((REPOSITORY_ROOT / "lib").glob("*.py"))
+        source_files.extend(
+            (REPOSITORY_ROOT / "geodesy_visualization").rglob("*.py")
+        )
         source_files.extend(REPOSITORY_ROOT.glob("plot_*/*.py"))
         return source_files
 
