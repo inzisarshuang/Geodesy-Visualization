@@ -12,7 +12,7 @@ pygmt_geo
     ``add_tifs``:
         按窗口相加两幅共网格单波段 GeoTIFF，并按配置传播空值。
     ``region_from_grd``:
-        从 GMT 可读网格提取 xmin、xmax、ymin、ymax 范围。
+        兼容重导出正式包中的网格绘图范围读取函数。
     ``tif2grd``:
         按窗口读取、缩放 GeoTIFF，并转换为 GMT GRD。
     ``txt2grd``:
@@ -23,27 +23,32 @@ pygmt_geo
         根据输入类型统一调度 TIF 或 TXT 网格转换。
     ``prepare_dataset_grid``:
         根据公共数据集配置结构准备 GMT GRD。
-    ``generate_tracks``:
-        在多组起止坐标之间生成命名的等间距剖面轨迹。
-    ``extract_profile``:
-        沿指定轨迹采样网格，并计算 WGS84 累计距离。
+    ``generate_tracks`` / ``extract_profile``:
+        兼容重导出正式包中的剖面轨迹生成和沿轨迹采样函数。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
+import sys
 
 import numpy as np
 import pandas as pd
 import pygmt
 import rasterio
-from pyproj import CRS, Geod, Transformer
+from pyproj import CRS, Transformer
 from rasterio.enums import Resampling
 from rasterio.transform import array_bounds
 from rasterio.warp import calculate_default_transform, reproject
 
 from pygmt_io import gmt_grdconvert, replace_dataset, temporary_path
+
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPOSITORY_ROOT))
+
+from geodesy_visualization.geo import extract_profile, generate_tracks, region_from_grd
 
 
 def _validate_matching_grids(src1: rasterio.io.DatasetReader, src2: rasterio.io.DatasetReader) -> None:
@@ -117,15 +122,6 @@ def add_tifs(
         replace_dataset(temporary_output, output)
 
     print(f"Output saved to: {output}")
-
-
-def region_from_grd(grid_path: str) -> List[float]:
-    """Return a GMT-readable grid region as ``[xmin, xmax, ymin, ymax]``."""
-    info_text = pygmt.grdinfo(grid=grid_path, per_column="n")
-    values = np.fromstring(info_text, sep=" ")
-    if values.size < 4:
-        raise ValueError(f"cannot parse grid region: {grid_path}")
-    return values[:4].astype(float).tolist()
 
 
 def tif2grd(
@@ -386,67 +382,14 @@ def prepare_dataset_grid(dataset: Dict[str, object]) -> List[float]:
     )
 
 
-def generate_tracks(
-    start_coords: List[Tuple[float, float]],
-    end_coords: List[Tuple[float, float]],
-    num_points: int = 100,
-    pointnames: Optional[List[str]] = None,
-) -> Dict[str, np.ndarray]:
-    """Generate named, evenly spaced profile tracks between coordinate pairs."""
-    if len(start_coords) != len(end_coords):
-        raise ValueError(
-            "start_coords and end_coords must have the same length; "
-            f"got {len(start_coords)} and {len(end_coords)}"
-        )
-    if not start_coords:
-        raise ValueError("at least one profile track is required")
-    if num_points < 2:
-        raise ValueError(f"num_points must be at least 2; got {num_points}")
-
-    if pointnames is None:
-        pointnames = [chr(ord("A") + index) for index in range(len(start_coords))]
-    if len(pointnames) != len(start_coords):
-        raise ValueError(
-            "pointnames must match the number of profile tracks; "
-            f"got {len(pointnames)} names and {len(start_coords)} tracks"
-        )
-    if len(set(pointnames)) != len(pointnames):
-        raise ValueError("pointnames must be unique")
-
-    tracks: Dict[str, np.ndarray] = {}
-    for name, start, end in zip(pointnames, start_coords, end_coords):
-        lons = np.linspace(start[0], end[0], num_points)
-        lats = np.linspace(start[1], end[1], num_points)
-        tracks[name] = np.column_stack((lons, lats))
-    return tracks
-
-
-def extract_profile(
-    grd_file: str,
-    track: np.ndarray,
-    newcolname: str = "z",
-) -> pd.DataFrame:
-    """Sample a GMT grid along a track and append WGS84 cumulative distance."""
-    track_array = np.asarray(track, dtype=float)
-    if track_array.ndim != 2 or track_array.shape[1] != 2 or len(track_array) < 2:
-        raise ValueError("track must have shape (n, 2) with at least two lon/lat points")
-
-    profile: pd.DataFrame = pygmt.grdtrack(
-        points=track_array,
-        grid=grd_file,
-        newcolname=newcolname,
-    )
-    if profile.shape[1] < 3:
-        raise ValueError(f"grdtrack returned fewer than three columns for {grd_file}")
-    profile = profile.iloc[:, :3].copy()
-    profile.columns = ["lon", "lat", newcolname]
-    if len(profile) == 0:
-        profile["distance"] = pd.Series(dtype=float)
-        return profile
-
-    geod = Geod(ellps="WGS84")
-    lons = profile["lon"].to_numpy(dtype=float)
-    lats = profile["lat"].to_numpy(dtype=float)
-    _, _, segment_distances = geod.inv(lons[:-1], lats[:-1], lons[1:], lats[1:])
-    profile["distance"] = np.concatenate(([0.0], np.cumsum(segment_distances)))
-    return profile
+__all__ = [
+    "add_tifs",
+    "defsour2grd",
+    "extract_profile",
+    "generate_tracks",
+    "prepare_dataset_grid",
+    "prepare_grid",
+    "region_from_grd",
+    "tif2grd",
+    "txt2grd",
+]

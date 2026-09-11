@@ -36,14 +36,14 @@ tests and documentation.
 | Function | Current production caller | Classification | Next action and gate |
 |---|---|---|---|
 | `add_tifs` | none | `analysis-candidate` | Keep in place. Move to Geodesy-Analysis only if a real workflow adopts it; otherwise deprecate after a separate usage review. |
-| `region_from_grd` | `plot_defo_dem_optic`, `plot_defo_profile` | `visualization-view` | Move with view-preparation code after a package compatibility entry point exists. |
+| `region_from_grd` | `plot_defo_dem_optic`, `plot_defo_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; the legacy module re-exports the same function object. |
 | `tif2grd` | internal only | `adapter-gated` | Split persistent reprojection/scaling from temporary GMT conversion; compare CRS, registration, transform, values, bounds, and nodata. |
 | `txt2grd` | internal only | `adapter-gated` | Replace source-table parsing with Adapter input, retaining only bounded temporary GMT gridding in Visualization. |
 | `defsour2grd` | internal only | `adapter-gated` | Remove direct Defsour knowledge from Visualization only after an Adapter reader/exporter supplies the same deformation column, CRS, units, and point order. |
 | `prepare_grid` | internal only | `visualization-view` | Later become a source-neutral view-preparation dispatcher; retain existing cfg aliases during transition. |
 | `prepare_dataset_grid` | `plot_defo_dem_optic`, `plot_defo_profile` | `visualization-view` | Preserve as the workflow compatibility boundary while the three conversion branches are separated. |
-| `generate_tracks` | `plot_defo_profile` | `visualization-view` | Keep as figure-oriented profile geometry unless tracks become persisted scientific products. |
-| `extract_profile` | `plot_defo_profile` | `visualization-view` | Keep as figure-oriented sampling unless sampled values become a reusable/exported analysis result. |
+| `generate_tracks` | `plot_defo_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; keep it figure-oriented unless tracks become persisted scientific products. |
+| `extract_profile` | `plot_defo_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; keep it figure-oriented unless sampled values become a reusable/exported analysis result. |
 
 The private `_validate_matching_grids` helper belongs with `add_tifs` and is not
 part of the public compatibility surface.
@@ -52,8 +52,8 @@ part of the public compatibility surface.
 
 ## Safe Migration Order / 安全迁移顺序
 
-1. Move the five `visualization-view` public functions behind a package API and
-   keep `lib/pygmt_geo.py` as a compatibility wrapper.
+1. Move the remaining `prepare_grid` and `prepare_dataset_grid` view dispatchers
+   behind a package API only after their adapter-gated branches are separated.
 2. Leave `adapter-gated` functions active until Data-Adapter owns equivalent
    source and persistent-output contracts.
 3. Split persistent conversion from temporary plotting grids and run shadow
@@ -61,8 +61,8 @@ part of the public compatibility surface.
 4. Decide `add_tifs` from an Analysis use case; do not include it in either move
    by convenience.
 
-1. 先把五个 `visualization-view` 公共函数迁入包 API，并保留
-   `lib/pygmt_geo.py` 兼容入口。
+1. 只有在受 Adapter 前置条件约束的分支完成拆分后，才把剩余的
+   `prepare_grid` 和 `prepare_dataset_grid` 视图调度器迁入包 API。
 2. 在 Data-Adapter 具备等价来源与持久输出契约前，保持 `adapter-gated`
    函数原位生效。
 3. 分开持久格式转换与绘图临时制网，完成影子数值对比后才切换调用者。

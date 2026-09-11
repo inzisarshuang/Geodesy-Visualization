@@ -22,6 +22,7 @@ PyGMT-Plotter/
 ├── docs/development/                 # engineering rules / 工程规则
 ├── geodesy_visualization/            # new public Python package / 新公共 Python 包
 │   ├── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
+│   ├── geo.py                        # view geometry and sampling / 视图几何与采样
 │   └── backends/
 │       └── pygmt.py                  # canonical PyGMT backend / 正式 PyGMT 后端
 ├── lib/
@@ -79,6 +80,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 `plot_defo_timeseries_map` 提供 cfg 驱动的多期地理子图；`plot_defo_timeseries_aux` 提供共享日期轴的形变、拟合、降水和温度组合图。每个流程的示例输入位于自身 `data/` 目录，结果写入 `result/`。
 
 - `geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
+- `geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: transitional raster conversion and view-preparation module; its function-level migration boundary is recorded in `docs/development/pygmt_geo_ownership.md`.<br>过渡期的栅格转换与视图准备模块；函数级迁移边界记录在 `docs/development/pygmt_geo_ownership.md`。
 - `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。

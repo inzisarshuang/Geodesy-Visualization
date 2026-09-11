@@ -5,6 +5,7 @@ This document explains the repository architecture behind the short rules in `AG
 ## Ownership Boundaries
 
 - `geodesy_visualization/io.py`: strict cfg parsing, path resolution, scalar/list parsing, temporary files, atomic replacement, and external command wrappers.
+- `geodesy_visualization/geo.py`: figure-oriented grid-region inspection, profile-track geometry, and profile sampling; it does not own source parsing or persistent scientific export.
 - `lib/pygmt_io.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
 - `lib/pygmt_geo.py`: transitional mixed module governed by `pygmt_geo_ownership.md`; do not move it wholesale or add new production callers without updating that map.
 - `geodesy_visualization/backends/pygmt.py`: PyGMT figure state, map composition, profile drawing, legends, annotations, and final figure output.

@@ -15,8 +15,15 @@ from rasterio.transform import from_origin
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPOSITORY_ROOT))
 sys.path.insert(0, str(REPOSITORY_ROOT / "lib"))
 
+import pygmt_geo as legacy_geo
+from geodesy_visualization.geo import (
+    extract_profile as canonical_extract_profile,
+    generate_tracks as canonical_generate_tracks,
+    region_from_grd as canonical_region_from_grd,
+)
 from pygmt_geo import add_tifs, defsour2grd, generate_tracks, tif2grd, txt2grd
 
 
@@ -74,6 +81,12 @@ class AddTifsTests(unittest.TestCase):
 
 
 class TrackTests(unittest.TestCase):
+    def test_legacy_module_reexports_canonical_view_functions(self) -> None:
+        """Keep all three old geo imports bound to the canonical package functions."""
+        self.assertIs(legacy_geo.extract_profile, canonical_extract_profile)
+        self.assertIs(legacy_geo.generate_tracks, canonical_generate_tracks)
+        self.assertIs(legacy_geo.region_from_grd, canonical_region_from_grd)
+
     def test_generates_named_tracks(self) -> None:
         """Generate the requested number of points under the requested track name."""
         tracks = generate_tracks(

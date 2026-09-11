@@ -42,7 +42,8 @@ lib_path = REPOSITORY_ROOT / "lib"
 sys.path.insert(0, str(REPOSITORY_ROOT))
 sys.path.insert(0, str(lib_path))
 
-from pygmt_geo import prepare_dataset_grid, region_from_grd
+from pygmt_geo import prepare_dataset_grid
+from geodesy_visualization.geo import region_from_grd
 from geodesy_visualization.io import (
     get_optional,
     get_required,

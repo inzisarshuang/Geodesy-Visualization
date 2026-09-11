@@ -3,7 +3,7 @@
 ## Module Responsibilities / 模块职责
 
 - Put configuration syntax, path handling, temporary files, external commands, and generic validation in `geodesy_visualization/io.py`; `lib/pygmt_io.py` is compatibility-only.<br>配置语法、路径处理、临时文件、外部命令和通用校验放在 `geodesy_visualization/io.py`；`lib/pygmt_io.py` 只用于兼容。
-- Put grid conversion, raster arithmetic, track generation, and spatial sampling in `lib/pygmt_geo.py`.<br>网格转换、栅格运算、轨迹生成和空间采样放在 `lib/pygmt_geo.py`。
+- Put figure-oriented grid inspection, track generation, and profile sampling in `geodesy_visualization/geo.py`. Keep only the explicitly mapped transitional conversions and raster arithmetic in `lib/pygmt_geo.py`.<br>面向图件的网格检查、轨迹生成和剖面采样放在 `geodesy_visualization/geo.py`；`lib/pygmt_geo.py` 仅保留职责表明确列出的过渡转换与栅格运算。
 - Put PyGMT figure state and reusable drawing primitives in `geodesy_visualization/backends/pygmt.py`; `lib/pygmt_visual.py` is compatibility-only.<br>PyGMT 绘图状态和公共绘图原语放在 `geodesy_visualization/backends/pygmt.py`；`lib/pygmt_visual.py` 只用于兼容。
 - Keep `plot_*` entry points focused on parameter normalization and orchestration. They import package-owned APIs from `geodesy_visualization` while their legacy paths remain stable.<br>`plot_*` 入口只负责参数归一化和流程编排；在保留旧路径的同时，从 `geodesy_visualization` 导入正式 API。
 - Add domain, mask, and export modules only when they own independent reusable behavior.<br>只有存在独立且可复用的职责时，才新增领域计算、掩膜或产品导出模块。
