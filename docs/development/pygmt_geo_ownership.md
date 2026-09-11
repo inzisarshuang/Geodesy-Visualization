@@ -36,12 +36,12 @@ tests and documentation.
 | Function | Current production caller | Classification | Next action and gate |
 |---|---|---|---|
 | `add_tifs` | none | `analysis-candidate` | Keep in place. Move to Geodesy-Analysis only if a real workflow adopts it; otherwise deprecate after a separate usage review. |
-| `region_from_grd` | `plot_defo_dem_optic`, `plot_defo_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; the legacy module re-exports the same function object. |
+| `region_from_grd` | `geodesy_visualization.workflows.insar.deformation_map`, `plot_defo_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; the legacy module re-exports the same function object. |
 | `tif2grd` | internal only | `adapter-gated` | Split persistent reprojection/scaling from temporary GMT conversion; compare CRS, registration, transform, values, bounds, and nodata. |
 | `txt2grd` | internal only | `adapter-gated` | Replace source-table parsing with Adapter input, retaining only bounded temporary GMT gridding in Visualization. |
 | `defsour2grd` | internal only | `adapter-gated` | Remove direct Defsour knowledge from Visualization only after an Adapter reader/exporter supplies the same deformation column, CRS, units, and point order. |
 | `prepare_grid` | internal only | `visualization-view` | Later become a source-neutral view-preparation dispatcher; retain existing cfg aliases during transition. |
-| `prepare_dataset_grid` | `plot_defo_dem_optic`, `plot_defo_profile` | `visualization-view` | Preserve as the workflow compatibility boundary while the three conversion branches are separated. |
+| `prepare_dataset_grid` | `geodesy_visualization.workflows.insar.deformation_map`, `plot_defo_profile` | `visualization-view` | Preserve as the workflow compatibility boundary while the three conversion branches are separated; package workflows use the qualified `lib.pygmt_geo` import. |
 | `generate_tracks` | `plot_defo_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; keep it figure-oriented unless tracks become persisted scientific products. |
 | `extract_profile` | `plot_defo_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; keep it figure-oriented unless sampled values become a reusable/exported analysis result. |
 

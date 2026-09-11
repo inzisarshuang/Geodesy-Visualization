@@ -26,6 +26,7 @@ PyGMT-Plotter/
 │   ├── data/
 │   │   └── canonical_grid.py         # bounded canonical HDF5 consumer / 标准 HDF5 分块消费层
 │   ├── workflows/insar/
+│   │   ├── deformation_map.py        # canonical deformation-map workflow / 正式形变地图流程
 │   │   ├── timeseries_aux.py         # canonical auxiliary-series workflow / 正式辅助时序流程
 │   │   └── timeseries_map.py         # canonical spatial time-series workflow / 正式空间时序流程
 │   └── backends/
@@ -92,6 +93,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
 - `geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
 - `geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。
+- `geodesy_visualization/workflows/insar/deformation_map.py`: canonical cfg-driven DEM/optical deformation-map orchestration; transitional source conversion remains behind `lib.pygmt_geo`.<br>正式的 cfg 驱动 DEM/光学形变地图编排；过渡期来源转换仍位于 `lib.pygmt_geo` 边界之后。
 - `lib/pygmt_visual.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有绘图器导入路径提供兼容重导出，不包含独立实现。
 - `plot_*/*.py`: workflow implementations not yet migrated, or compatibility CLIs for migrated workflows.<br>尚未迁移的工作流实现，或已迁移工作流的兼容命令行入口。
 

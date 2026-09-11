@@ -13,16 +13,19 @@ GEO_MODULE = REPOSITORY_ROOT / "lib" / "pygmt_geo.py"
 OWNERSHIP_MAP = REPOSITORY_ROOT / "docs" / "development" / "pygmt_geo_ownership.md"
 
 EXPECTED_LEGACY_GEO_IMPORTS = {
-    "plot_defo_dem_optic/plot_defo_dem_optic.py": {
-        "prepare_dataset_grid",
-    },
     "plot_defo_profile/plot_defo_dem_profile.py": {
         "prepare_dataset_grid",
     },
 }
 
+EXPECTED_PACKAGE_GEO_IMPORTS = {
+    "geodesy_visualization/workflows/insar/deformation_map.py": {
+        "prepare_dataset_grid",
+    },
+}
+
 EXPECTED_CANONICAL_GEO_IMPORTS = {
-    "plot_defo_dem_optic/plot_defo_dem_optic.py": {
+    "geodesy_visualization/workflows/insar/deformation_map.py": {
         "region_from_grd",
     },
     "plot_defo_profile/plot_defo_dem_profile.py": {
@@ -59,7 +62,7 @@ def documented_functions(path: Path) -> set[str]:
 def production_imports(module_name: str) -> dict[str, set[str]]:
     """Find every direct production import from one named geo module."""
     imports: dict[str, set[str]] = {}
-    excluded_roots = {".git", "tests", "lib", "geodesy_visualization"}
+    excluded_roots = {".git", "tests", "lib"}
     for path in REPOSITORY_ROOT.rglob("*.py"):
         relative = path.relative_to(REPOSITORY_ROOT)
         if relative.parts[0] in excluded_roots:
@@ -84,6 +87,9 @@ class OwnershipMapTests(unittest.TestCase):
     def test_tracks_every_production_geo_import(self) -> None:
         """Require new production callers to be reviewed before entering the tree."""
         self.assertEqual(production_imports("pygmt_geo"), EXPECTED_LEGACY_GEO_IMPORTS)
+        self.assertEqual(
+            production_imports("lib.pygmt_geo"), EXPECTED_PACKAGE_GEO_IMPORTS
+        )
         self.assertEqual(
             production_imports("geodesy_visualization.geo"),
             EXPECTED_CANONICAL_GEO_IMPORTS,
