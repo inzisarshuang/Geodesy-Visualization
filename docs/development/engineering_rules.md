@@ -7,7 +7,8 @@ This document explains the repository architecture behind the short rules in `AG
 - `geodesy_visualization/io.py`: strict cfg parsing, path resolution, scalar/list parsing, temporary files, atomic replacement, and external command wrappers.
 - `lib/pygmt_io.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
 - `lib/pygmt_geo.py`: geospatial raster arithmetic, TIF/TXT conversion, grid regions, profile tracks, and spatial sampling.
-- `lib/pygmt_visual.py`: figure state, map composition, profile drawing, legends, annotations, and final figure output.
+- `geodesy_visualization/backends/pygmt.py`: PyGMT figure state, map composition, profile drawing, legends, annotations, and final figure output.
+- `lib/pygmt_visual.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
 - `plot_*/`: workflow-specific cfg loading and orchestration.
 - `tests/`: fast regression checks using temporary data.
 

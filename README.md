@@ -21,11 +21,13 @@ PyGMT-Plotter/
 ├── cpt/                              # shared color palettes / 公共色带
 ├── docs/development/                 # engineering rules / 工程规则
 ├── geodesy_visualization/            # new public Python package / 新公共 Python 包
-│   └── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
+│   ├── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
+│   └── backends/
+│       └── pygmt.py                  # canonical PyGMT backend / 正式 PyGMT 后端
 ├── lib/
 │   ├── pygmt_io.py                   # compatibility import / 兼容导入
 │   ├── pygmt_geo.py                  # spatial processing / 空间处理
-│   └── pygmt_visual.py               # plotting / 绘图
+│   └── pygmt_visual.py               # compatibility import / 兼容导入
 ├── plot_defo_dem_optic/              # deformation map workflow / 形变地图流程
 ├── plot_defo_profile/                # map and profile workflow / 地图与剖面流程
 ├── plot_defo_timeseries_map/          # spatial time-series panels / 空间时序子图
@@ -79,7 +81,8 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - `geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: raster arithmetic, TIF/TXT conversion, grid regions, track generation, and profile extraction.<br>负责栅格运算、TIF/TXT 转换、网格范围、轨迹生成和剖面提取。
-- `lib/pygmt_visual.py`: figure state, map layers, profile plots, annotations, legends, and final figure output.<br>负责图形状态、地图图层、剖面图、注记、图例和最终图片输出。
+- `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
+- `lib/pygmt_visual.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有绘图器导入路径提供兼容重导出，不包含独立实现。
 - `plot_*/*.py`: cfg normalization and workflow orchestration only.<br>入口脚本只负责 cfg 参数归一化和流程编排。
 
 ## 3. Dependencies / 依赖环境

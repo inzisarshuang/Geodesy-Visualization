@@ -7,12 +7,18 @@ import unittest
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPOSITORY_ROOT))
 sys.path.insert(0, str(REPOSITORY_ROOT / "lib"))
 
-from pygmt_visual import PyGMTPlotter
+import pygmt_visual as legacy_visual
+from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
 class PlotterStateTests(unittest.TestCase):
+    def test_legacy_module_reexports_canonical_backend(self) -> None:
+        """Keep the old plotter import bound to the canonical backend class."""
+        self.assertIs(legacy_visual.PyGMTPlotter, PyGMTPlotter)
+
     def test_requires_active_figure_before_saving(self) -> None:
         """Reject save requests until the caller creates a figure."""
         with self.assertRaisesRegex(RuntimeError, "call new"):

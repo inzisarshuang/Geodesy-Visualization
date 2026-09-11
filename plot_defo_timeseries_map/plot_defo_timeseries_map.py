@@ -44,7 +44,7 @@ from geodesy_visualization.io import (
     validate_config_keys,
     validate_numeric_range,
 )
-from pygmt_visual import PyGMTPlotter
+from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
 ALLOWED_KEYS = {
