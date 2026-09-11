@@ -11,6 +11,7 @@ This directory contains stable code-maintenance rules. Project-specific plotting
 | All code changes | `engineering_rules.md` |
 | Python, PyGMT, or cfg interfaces | `python_rules.md` |
 | Units, nodata, coordinates, or display ranges | `scientific_conventions.md` |
+| `lib/pygmt_geo.py` changes or migration | `pygmt_geo_ownership.md` |
 | AI coding-agent entry point | Repository-root `AGENTS.md` |
 
 | 修改类型 | 必读文件 |
@@ -18,6 +19,7 @@ This directory contains stable code-maintenance rules. Project-specific plotting
 | 所有代码修改 | `engineering_rules.md` |
 | Python、PyGMT 或配置接口 | `python_rules.md` |
 | 单位、nodata、坐标或显示范围 | `scientific_conventions.md` |
+| `lib/pygmt_geo.py` 修改或迁移 | `pygmt_geo_ownership.md` |
 | AI 代码代理入口 | 仓库根目录 `AGENTS.md` |
 
 The repository currently has no Shell workflow, so it does not include an empty `shell_rules.md`. Add that document only when an actual Shell entry point is introduced and maintained.

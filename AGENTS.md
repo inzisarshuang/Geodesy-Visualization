@@ -7,6 +7,7 @@ This file defines the rules an AI coding agent or human contributor should read 
 - Keep plotting workflows configuration-driven. Scientific paths, units, scales, color limits, transparency, and styles belong in cfg files, not hidden constants in entry scripts.
 - Reuse `geodesy_visualization/io.py`, `geodesy_visualization/backends/pygmt.py`, and `lib/pygmt_geo.py` before adding helpers. `lib/pygmt_io.py` and `lib/pygmt_visual.py` are compatibility imports only.
 - Keep configuration and file mechanics in `geodesy_visualization.io`, spatial conversion and sampling in `pygmt_geo`, and PyGMT figure composition in `geodesy_visualization.backends.pygmt`.
+- Before changing or moving `lib/pygmt_geo.py`, read and update `docs/development/pygmt_geo_ownership.md`; do not move that mixed module wholesale.
 - Add domain, mask, or export modules only when the repository has independent behavior to own; do not create empty pipeline stages.
 - Add a shared function only when it removes real duplication or establishes one scientific behavior in one place.
 - Preserve existing cfg keys unless a migration path and compatibility alias are provided.
