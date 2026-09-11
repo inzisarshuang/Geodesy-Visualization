@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,9 @@ import numpy as np
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from geodesy_visualization.workflows.insar import timeseries_aux as canonical_aux
 
 
 def load_workflow(name: str, relative_path: str):
@@ -83,6 +87,17 @@ class SpatialTimeSeriesTests(unittest.TestCase):
 
 
 class AuxiliaryTimeSeriesTests(unittest.TestCase):
+    def test_legacy_script_reexports_canonical_workflow(self) -> None:
+        """Keep the old script API and default cfg bound to the package workflow."""
+        self.assertIs(AUXILIARY.load_config, canonical_aux.load_config)
+        self.assertIs(AUXILIARY.read_date_value_table, canonical_aux.read_date_value_table)
+        self.assertIs(AUXILIARY.render, canonical_aux.render)
+        parsed = canonical_aux.build_parser().parse_args([])
+        self.assertEqual(
+            Path(parsed.config),
+            REPOSITORY_ROOT / "plot_defo_timeseries_aux" / "plot_defo_timeseries_aux.cfg",
+        )
+
     def test_sorts_dates_and_rejects_duplicates(self) -> None:
         """Normalize unsorted input while rejecting ambiguous repeated dates."""
         with tempfile.TemporaryDirectory() as directory:

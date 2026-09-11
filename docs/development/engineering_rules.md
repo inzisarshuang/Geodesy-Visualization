@@ -9,8 +9,9 @@ This document explains the repository architecture behind the short rules in `AG
 - `lib/pygmt_io.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
 - `lib/pygmt_geo.py`: transitional mixed module governed by `pygmt_geo_ownership.md`; do not move it wholesale or add new production callers without updating that map.
 - `geodesy_visualization/backends/pygmt.py`: PyGMT figure state, map composition, profile drawing, legends, annotations, and final figure output.
+- `geodesy_visualization/workflows/`: canonical cfg normalization and figure orchestration, organized by scientific domain where the workflow is domain-specific.
 - `lib/pygmt_visual.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
-- `plot_*/`: workflow-specific cfg loading and orchestration.
+- `plot_*/`: stable cfg/data examples and compatibility CLI scripts while workflows migrate into the package.
 - `tests/`: fast regression checks using temporary data.
 
 Do not copy conversion branches or configuration parsers into an entry script. Extend the owning shared module when two workflows need the same behavior. New package-owned code belongs under `geodesy_visualization/`; legacy `lib/` paths remain only until their callers have compatibility coverage.
