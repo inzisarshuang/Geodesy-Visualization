@@ -3,7 +3,9 @@ geodesy_visualization.workflows.insar.timeseries_map
 ==================================================
 
 功能概述:
-    读取 lon/lat/多期形变宽表和日期列表，通过 cfg 生成地理坐标系时序子图。
+    读取 lon/lat/多期形变宽表或标准规则栅格 HDF5，通过 cfg 生成地理坐标系
+    散点时序子图。标准 HDF5 仅通过 Adapter 公共 API 按行块消费，不物化完整
+    数据立方体；GRD 渲染不属于本模块当前阶段。
 
 函数说明:
     ``build_parser``: 构建 cfg 命令行入口。
@@ -11,6 +13,7 @@ geodesy_visualization.workflows.insar.timeseries_map
     ``load_timeseries_table``: 分块读取坐标和所选时序列。
     ``draw_panel_basemap``: 绘制空白、DEM 或光学底图。
     ``render``: 组合时序子图并安全保存。
+    ``render_canonical``: 按时期和行块绘制标准 HDF5 散点时序子图。
     ``main``: 执行配置加载、数据读取和绘图。
 """
 
@@ -20,10 +23,13 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
 import pygmt
+from pyproj import CRS
+from pyproj.exceptions import CRSError
 
 from geodesy_visualization.io import (
     get_optional,
@@ -40,6 +46,11 @@ from geodesy_visualization.io import (
     validate_numeric_range,
 )
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
+from geodesy_visualization.data import (
+    CanonicalGridSelection,
+    iter_canonical_grid_blocks,
+    load_canonical_grid_selection,
+)
 
 
 DEFAULT_CONFIG = (
@@ -50,7 +61,8 @@ DEFAULT_CONFIG = (
 
 
 ALLOWED_KEYS = {
-    "data_file", "dates_file", "output_dir", "output_file", "region_west", "region_east",
+    "data_source", "data_file", "dates_file", "canonical_unit", "canonical_crs",
+    "output_dir", "output_file", "region_west", "region_east",
     "region_south", "region_north", "projection", "subplot_rows", "subplot_columns",
     "panel_margin_x", "panel_margin_y", "canvas_margin", "start_epoch", "end_epoch",
     "data_scale", "bar_min",
@@ -100,9 +112,20 @@ def load_config(config_file: str) -> dict[str, object]:
         if cpt_path.suffix.lower() == ".cpt" or cpt_path.parent != Path(".")
         else cpt_value
     )
+    data_source = parse_choice(
+        get_optional(raw, "data_source", "table"),
+        ("table", "canonical"),
+        "data_source",
+    )
+    dates_value = get_optional(raw, "dates_file", "")
+    if data_source == "table" and not dates_value:
+        raise ValueError("dates_file is required when data_source=table")
     cfg = {
+        "data_source": data_source,
         "data_file": resolve_path(get_required(raw, "data_file"), base),
-        "dates_file": resolve_path(get_required(raw, "dates_file"), base),
+        "dates_file": resolve_path(dates_value, base) if dates_value else "",
+        "canonical_unit": get_optional(raw, "canonical_unit", "mm"),
+        "canonical_crs": get_optional(raw, "canonical_crs", "EPSG:4326"),
         "output": resolve_output_path(get_optional(raw, "output_file", "deformation_timeseries_map.png"), output_dir, base),
         "region": region,
         "projection": get_optional(raw, "projection", "M4i"),
@@ -206,6 +229,18 @@ def load_config(config_file: str) -> dict[str, object]:
         raise ValueError("subplot layout has fewer panels than selected epochs")
     if cfg["basemap_mode"] != "none" and not cfg["basemap_tif"]:
         raise ValueError("basemap_tif is required for DEM or optical basemap mode")
+    if cfg["data_source"] == "canonical":
+        try:
+            canonical_crs = CRS.from_user_input(str(cfg["canonical_crs"]))
+        except CRSError as error:
+            raise ValueError(
+                f"canonical_crs is invalid: {cfg['canonical_crs']}"
+            ) from error
+        if not canonical_crs.is_geographic:
+            raise ValueError(
+                "canonical scatter input must use a geographic CRS because its "
+                "x/y axes are plotted as longitude/latitude"
+            )
     validate_numeric_range(cfg["bar_min"], cfg["bar_max"], "bar_min", "bar_max")
     return cfg
 
@@ -415,6 +450,45 @@ def render(
     dates: list[str],
 ) -> Path:
     """Render selected epochs as geographic scatter-map panels and save atomically."""
+    def draw_data(figure: object, index: int) -> None:
+        """Draw one selected column from the legacy in-memory table."""
+        _plot_scatter(
+            figure,
+            cfg,
+            longitude,
+            latitude,
+            values[:, index],
+        )
+
+    return _render_panels(cfg, dates, draw_data)
+
+
+def _plot_scatter(
+    figure: object,
+    cfg: dict[str, object],
+    longitude: np.ndarray,
+    latitude: np.ndarray,
+    values: np.ndarray,
+) -> None:
+    """Draw one scatter batch with the workflow's shared point style."""
+    kwargs = {
+        "x": longitude,
+        "y": latitude,
+        "fill": values,
+        "cmap": True,
+        "style": str(cfg["point_style"]),
+    }
+    if cfg["point_pen"]:
+        kwargs["pen"] = str(cfg["point_pen"])
+    figure.plot(**kwargs)
+
+
+def _render_panels(
+    cfg: dict[str, object],
+    dates: list[str],
+    draw_data: Callable[[object, int], None],
+) -> Path:
+    """Compose shared panel furniture and delegate each panel's deformation layer."""
     plotter = PyGMTPlotter(defaults=cfg["defaults"])
     plotter.new()
     figure = plotter._require_figure()
@@ -472,16 +546,7 @@ def render(
                     coordinate_font,
                 )
                 draw_panel_basemap(plotter, cfg)
-                kwargs = {
-                    "x": longitude,
-                    "y": latitude,
-                    "fill": values[:, index],
-                    "cmap": True,
-                    "style": str(cfg["point_style"]),
-                }
-                if cfg["point_pen"]:
-                    kwargs["pen"] = str(cfg["point_pen"])
-                figure.plot(**kwargs)
+                draw_data(figure, index)
     if cfg["add_colorbar"]:
         with pygmt.config(
             FONT_ANNOT_PRIMARY=colorbar_annotation_font,
@@ -511,15 +576,70 @@ def render(
     return destination
 
 
+def render_canonical(
+    cfg: dict[str, object],
+    selection: CanonicalGridSelection,
+) -> Path:
+    """Render canonical deformation by bounded row blocks without assembling a cube."""
+    block_iterator = iter(iter_canonical_grid_blocks(
+        selection,
+        chunk_rows=int(cfg["chunk_rows"]),
+    ))
+    pending = next(block_iterator, None)
+
+    def draw_data(figure: object, index: int) -> None:
+        """Draw every bounded row block belonging to one selected epoch."""
+        nonlocal pending
+        expected_epoch = selection.epoch_indices[index]
+        if pending is None or pending.epoch_index != expected_epoch:
+            raise RuntimeError(
+                f"canonical row blocks are missing epoch index {expected_epoch}"
+            )
+        while pending is not None and pending.epoch_index == expected_epoch:
+            row_count = pending.row_stop - pending.row_start
+            longitude = np.tile(selection.x, row_count)
+            latitude = np.repeat(pending.y, selection.columns)
+            values = pending.values.reshape(-1)
+            valid = pending.valid_mask.reshape(-1) & np.isfinite(values)
+            if np.any(valid):
+                _plot_scatter(
+                    figure,
+                    cfg,
+                    longitude[valid],
+                    latitude[valid],
+                    values[valid] * float(cfg["scale"]),
+                )
+            pending = next(block_iterator, None)
+
+    try:
+        destination = _render_panels(cfg, list(selection.dates), draw_data)
+    finally:
+        block_iterator.close()
+    if pending is not None:
+        raise RuntimeError("canonical renderer did not consume every selected row block")
+    return destination
+
+
 def main() -> None:
     """Load one cfg, read the selected epochs and render the time-series map."""
     cfg = load_config(build_parser().parse_args().config)
-    data = load_timeseries_table(
-        str(cfg["data_file"]), str(cfg["dates_file"]), int(cfg["start_epoch"]),
-        int(cfg["end_epoch"]), float(cfg["scale"]), int(cfg["chunk_rows"]),
-        list(cfg["nan_tokens"]),
-    )
-    print(f"Saved: {render(cfg, *data)}")
+    if cfg["data_source"] == "table":
+        data = load_timeseries_table(
+            str(cfg["data_file"]), str(cfg["dates_file"]), int(cfg["start_epoch"]),
+            int(cfg["end_epoch"]), float(cfg["scale"]), int(cfg["chunk_rows"]),
+            list(cfg["nan_tokens"]),
+        )
+        destination = render(cfg, *data)
+    else:
+        selection = load_canonical_grid_selection(
+            str(cfg["data_file"]),
+            int(cfg["start_epoch"]),
+            int(cfg["end_epoch"]),
+            expected_unit=str(cfg["canonical_unit"]),
+            expected_crs=str(cfg["canonical_crs"]),
+        )
+        destination = render_canonical(cfg, selection)
+    print(f"Saved: {destination}")
 
 
 __all__ = [
@@ -530,6 +650,7 @@ __all__ = [
     "load_timeseries_table",
     "main",
     "render",
+    "render_canonical",
 ]
 
 

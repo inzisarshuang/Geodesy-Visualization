@@ -176,6 +176,13 @@ Each example cfg documents every supported key, unit, valid choice, and output o
   spatial time-series columns use
   `epoch_NNN_deformation_YYYYMMDD_mm` and are checked against
   `epoch_index date_yyyymmdd` in the dates table.<br>示例文本输入均使用包含单位的明确表头。地理点表以 `lon lat` 开头，辅助时序表以 `date_yyyymmdd` 开头；空间时序列使用 `epoch_NNN_deformation_YYYYMMDD_mm`，并与日期表中的 `epoch_index date_yyyymmdd` 逐列核对。
+- Spatial time-series cfg files select `data_source=table|canonical`. Canonical
+  HDF5 is validated through Adapter 0.8, including unit and CRS, and sent to
+  the existing scatter renderer by bounded epoch/row blocks. It does not need
+  a separate dates table. GRD rendering remains a later migration phase.<br>
+  空间时序 cfg 使用 `data_source=table|canonical` 选择数据源。标准 HDF5 通过
+  Adapter 0.8 校验单位和 CRS，并按时期、行块送入现有散点绘制；无需独立日期表。
+  GRD 绘制仍属于后续迁移阶段。
 - The repository versions a spatially representative time-series example;
   full-resolution local tables remain ignored because GitHub rejects files
   larger than 100 MB.<br>仓库保存具有空间代表性的时序示例；完整分辨率本地表保持忽略，因为 GitHub 拒绝超过 100 MB 的单个文件。

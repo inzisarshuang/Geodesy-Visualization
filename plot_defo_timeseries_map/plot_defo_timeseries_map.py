@@ -11,7 +11,7 @@ plot_defo_timeseries_map
         兼容重导出正式模块中的命令行与配置接口。
     ``load_timeseries_table``:
         兼容重导出正式模块中的分块时序读取接口。
-    ``draw_panel_basemap`` / ``render``:
+    ``draw_panel_basemap`` / ``render`` / ``render_canonical``:
         兼容重导出正式模块中的子图底图与绘图接口。
     ``main``:
         调用正式工作流入口。
@@ -35,6 +35,7 @@ from geodesy_visualization.workflows.insar.timeseries_map import (  # noqa: E402
     load_timeseries_table,
     main,
     render,
+    render_canonical,
 )
 
 
@@ -46,6 +47,7 @@ __all__ = [
     "load_timeseries_table",
     "main",
     "render",
+    "render_canonical",
 ]
 
 
