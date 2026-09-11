@@ -24,7 +24,8 @@ PyGMT-Plotter/
 │   ├── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
 │   ├── geo.py                        # view geometry and sampling / 视图几何与采样
 │   ├── workflows/insar/
-│   │   └── timeseries_aux.py         # canonical auxiliary-series workflow / 正式辅助时序流程
+│   │   ├── timeseries_aux.py         # canonical auxiliary-series workflow / 正式辅助时序流程
+│   │   └── timeseries_map.py         # canonical spatial time-series workflow / 正式空间时序流程
 │   └── backends/
 │       └── pygmt.py                  # canonical PyGMT backend / 正式 PyGMT 后端
 ├── lib/
@@ -87,6 +88,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - `lib/pygmt_geo.py`: transitional raster conversion and view-preparation module; its function-level migration boundary is recorded in `docs/development/pygmt_geo_ownership.md`.<br>过渡期的栅格转换与视图准备模块；函数级迁移边界记录在 `docs/development/pygmt_geo_ownership.md`。
 - `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
 - `geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
+- `geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。
 - `lib/pygmt_visual.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有绘图器导入路径提供兼容重导出，不包含独立实现。
 - `plot_*/*.py`: workflow implementations not yet migrated, or compatibility CLIs for migrated workflows.<br>尚未迁移的工作流实现，或已迁移工作流的兼容命令行入口。
 

@@ -15,6 +15,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from geodesy_visualization.workflows.insar import timeseries_aux as canonical_aux
+from geodesy_visualization.workflows.insar import timeseries_map as canonical_map
 
 
 def load_workflow(name: str, relative_path: str):
@@ -38,6 +39,17 @@ AUXILIARY = load_workflow(
 
 
 class SpatialTimeSeriesTests(unittest.TestCase):
+    def test_legacy_script_reexports_canonical_workflow(self) -> None:
+        """Keep the old map script API and default cfg bound to the package workflow."""
+        self.assertIs(SPATIAL.load_config, canonical_map.load_config)
+        self.assertIs(SPATIAL.load_timeseries_table, canonical_map.load_timeseries_table)
+        self.assertIs(SPATIAL.render, canonical_map.render)
+        parsed = canonical_map.build_parser().parse_args([])
+        self.assertEqual(
+            Path(parsed.config),
+            REPOSITORY_ROOT / "plot_defo_timeseries_map" / "plot_defo_timeseries_map.cfg",
+        )
+
     def test_resolves_file_cpt_relative_to_config(self) -> None:
         """Resolve a shared CPT from the cfg directory, independent of cwd."""
         with tempfile.TemporaryDirectory() as directory:
