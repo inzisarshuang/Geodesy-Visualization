@@ -5,3 +5,5 @@ pandas
 pygmt
 pyproj
 rasterio
+# Install a local editable checkout first until this package is published.
+insar-data-adapter>=0.8.0
