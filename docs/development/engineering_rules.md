@@ -8,7 +8,7 @@ This document explains the repository architecture behind the short rules in `AG
 - `geodesy_visualization/geo.py`: figure-oriented grid-region inspection, profile-track geometry, and profile sampling; it does not own source parsing or persistent scientific export.
 - `geodesy_visualization/data/`: consumer-side selection and bounded iteration over validated Adapter products; it preserves scientific values and metadata without source parsing or conversion.
 - `lib/pygmt_io.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
-- `lib/pygmt_geo.py`: transitional mixed module governed by `pygmt_geo_ownership.md`; do not move it wholesale or add new production callers without updating that map.
+- `lib/pygmt_geo.py`: transitional mixed module governed by `pygmt_geo_ownership.md`; package workflows may use the qualified `lib.pygmt_geo` compatibility boundary, but must not move it wholesale or add callers without updating that map.
 - `geodesy_visualization/backends/pygmt.py`: PyGMT figure state, map composition, profile drawing, legends, annotations, and final figure output.
 - `geodesy_visualization/workflows/`: canonical cfg normalization and figure orchestration, organized by scientific domain where the workflow is domain-specific.
 - `lib/pygmt_visual.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.

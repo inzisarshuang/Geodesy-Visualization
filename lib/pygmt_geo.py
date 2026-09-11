@@ -42,7 +42,7 @@ from rasterio.enums import Resampling
 from rasterio.transform import array_bounds
 from rasterio.warp import calculate_default_transform, reproject
 
-from pygmt_io import gmt_grdconvert, replace_dataset, temporary_path
+from geodesy_visualization.io import gmt_grdconvert, replace_dataset, temporary_path
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPOSITORY_ROOT) not in sys.path:

@@ -19,6 +19,7 @@ sys.path.insert(0, str(REPOSITORY_ROOT))
 sys.path.insert(0, str(REPOSITORY_ROOT / "lib"))
 
 import pygmt_geo as legacy_geo
+from lib import pygmt_geo as package_geo
 from geodesy_visualization.geo import (
     extract_profile as canonical_extract_profile,
     generate_tracks as canonical_generate_tracks,
@@ -81,6 +82,11 @@ class AddTifsTests(unittest.TestCase):
 
 
 class TrackTests(unittest.TestCase):
+    def test_transitional_module_supports_package_qualified_import(self) -> None:
+        """Allow canonical workflows to import the mixed boundary without sys.path edits."""
+        self.assertTrue(callable(package_geo.prepare_dataset_grid))
+        self.assertIs(package_geo.region_from_grd, canonical_region_from_grd)
+
     def test_legacy_module_reexports_canonical_view_functions(self) -> None:
         """Keep all three old geo imports bound to the canonical package functions."""
         self.assertIs(legacy_geo.extract_profile, canonical_extract_profile)
