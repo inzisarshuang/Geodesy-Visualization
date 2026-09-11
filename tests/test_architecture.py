@@ -12,14 +12,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 GEO_MODULE = REPOSITORY_ROOT / "lib" / "pygmt_geo.py"
 OWNERSHIP_MAP = REPOSITORY_ROOT / "docs" / "development" / "pygmt_geo_ownership.md"
 
-EXPECTED_LEGACY_GEO_IMPORTS = {
-    "plot_defo_profile/plot_defo_dem_profile.py": {
-        "prepare_dataset_grid",
-    },
-}
+EXPECTED_LEGACY_GEO_IMPORTS = {}
 
 EXPECTED_PACKAGE_GEO_IMPORTS = {
     "geodesy_visualization/workflows/insar/deformation_map.py": {
+        "prepare_dataset_grid",
+    },
+    "geodesy_visualization/workflows/insar/deformation_profile.py": {
         "prepare_dataset_grid",
     },
 }
@@ -28,7 +27,7 @@ EXPECTED_CANONICAL_GEO_IMPORTS = {
     "geodesy_visualization/workflows/insar/deformation_map.py": {
         "region_from_grd",
     },
-    "plot_defo_profile/plot_defo_dem_profile.py": {
+    "geodesy_visualization/workflows/insar/deformation_profile.py": {
         "extract_profile",
         "generate_tracks",
         "region_from_grd",
