@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import importlib.util
 import sys
 import tempfile
@@ -10,6 +11,7 @@ from unittest import mock
 from pathlib import Path
 
 import numpy as np
+import rasterio
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +49,9 @@ class SpatialTimeSeriesTests(unittest.TestCase):
         self.assertIs(SPATIAL.load_timeseries_table, canonical_map.load_timeseries_table)
         self.assertIs(SPATIAL.render, canonical_map.render)
         self.assertIs(SPATIAL.render_canonical, canonical_map.render_canonical)
+        self.assertIs(
+            SPATIAL.render_canonical_grid, canonical_map.render_canonical_grid
+        )
         parsed = canonical_map.build_parser().parse_args([])
         self.assertEqual(
             Path(parsed.config),
@@ -217,6 +222,118 @@ class SpatialTimeSeriesTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "geographic CRS"):
+                canonical_map.load_config(str(config))
+
+    def test_canonical_grid_writes_north_up_masked_epoch_by_rows(self) -> None:
+        """Create one temporary raster with correct axis reversal, mask, and scale."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            product = root / "canonical.h5"
+            metadata = GridMetadata(
+                source_format="synthetic",
+                deformation_unit="mm",
+                deformation_quantity="cumulative_displacement",
+                los_positive="toward_satellite",
+                crs="EPSG:4326",
+                nodata_policy="valid_mask is authoritative; zero is valid",
+                temporal_reference="20200101",
+                spatial_reference="none",
+                source_provenance="grid orientation test",
+            )
+            valid = np.ones((3, 2), dtype=bool)
+            valid[1, 1] = False
+            with CanonicalGridWriter(
+                product,
+                ("20200101",),
+                rows=3,
+                columns=2,
+                x=(11.0, 10.0),
+                y=(20.0, 21.0, 22.0),
+                metadata=metadata,
+                chunk_rows=1,
+            ) as writer:
+                writer.write_geometry_rows(0, np.zeros((3, 2)), valid)
+                writer.write_epoch(
+                    0,
+                    np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32),
+                )
+            config = root / "grid.cfg"
+            config.write_text(
+                "data_source = canonical\nrender_mode = grid\n"
+                "data_file = canonical.h5\ncanonical_unit = mm\n"
+                "canonical_crs = EPSG:4326\n"
+                "region_west = 9\nregion_east = 12\n"
+                "region_south = 19\nregion_north = 23\n"
+                "subplot_rows = 1\nsubplot_columns = 1\n"
+                "start_epoch = 1\nend_epoch = 1\n"
+                "data_scale = 2\nchunk_rows = 1\n",
+                encoding="utf-8",
+            )
+            cfg = canonical_map.load_config(str(config))
+            selection = canonical_map.load_canonical_grid_selection(
+                product,
+                expected_unit="mm",
+                expected_crs="EPSG:4326",
+            )
+            self.assertTrue(canonical_map._canonical_grid_is_supported(selection))
+            gridline_selection = replace(
+                selection,
+                metadata=replace(selection.metadata, grid_registration="gridline"),
+            )
+            self.assertFalse(
+                canonical_map._canonical_grid_is_supported(gridline_selection)
+            )
+            rasters: list[tuple[np.ndarray, object, object]] = []
+
+            class RecordingFigure:
+                """Read the temporary raster while it exists inside the callback."""
+
+                def grdimage(self, *, grid: str, **kwargs: object) -> None:
+                    """Capture raster values, bounds, CRS, and plotting options."""
+                    with rasterio.open(grid) as dataset:
+                        rasters.append(
+                            (dataset.read(1), dataset.bounds, dataset.crs)
+                        )
+                    self.options = kwargs
+
+            figure = RecordingFigure()
+
+            def fake_render_panels(cfg_value, dates, draw_data):
+                """Run the real grid callback without creating a GMT session."""
+                for index in range(len(dates)):
+                    draw_data(figure, index)
+                return Path(str(cfg_value["output"]))
+
+            with mock.patch.object(
+                canonical_map, "_render_panels", side_effect=fake_render_panels
+            ):
+                canonical_map.render_canonical_grid(cfg, selection)
+
+            self.assertFalse(list(root.glob(".pygmt_*.tif")))
+
+        self.assertEqual(len(rasters), 1)
+        np.testing.assert_allclose(
+            rasters[0][0],
+            [[12, 10], [np.nan, 6], [4, 2]],
+            equal_nan=True,
+        )
+        self.assertEqual(tuple(rasters[0][1]), (9.5, 19.5, 11.5, 22.5))
+        self.assertEqual(rasters[0][2].to_string(), "EPSG:4326")
+        self.assertEqual(figure.options["interpolation"], "n")
+        self.assertEqual(figure.options["transparency"], 0)
+
+    def test_grid_mode_rejects_table_source(self) -> None:
+        """Keep gridded rendering limited to canonical regular-grid products."""
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "table_grid.cfg"
+            config.write_text(
+                "data_source = table\nrender_mode = grid\n"
+                "data_file = values.txt\ndates_file = dates.txt\n"
+                "region_west = 0\nregion_east = 1\n"
+                "region_south = 0\nregion_north = 1\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "requires data_source=canonical"):
                 canonical_map.load_config(str(config))
 
 

@@ -5,7 +5,7 @@ geodesy_visualization.workflows.insar.timeseries_map
 功能概述:
     读取 lon/lat/多期形变宽表或标准规则栅格 HDF5，通过 cfg 生成地理坐标系
     散点时序子图。标准 HDF5 仅通过 Adapter 公共 API 按行块消费，不物化完整
-    数据立方体；GRD 渲染不属于本模块当前阶段。
+    数据立方体。规则网格模式按时期写临时 GeoTIFF，不生成大型 XYZ 点列表。
 
 函数说明:
     ``build_parser``: 构建 cfg 命令行入口。
@@ -14,6 +14,7 @@ geodesy_visualization.workflows.insar.timeseries_map
     ``draw_panel_basemap``: 绘制空白、DEM 或光学底图。
     ``render``: 组合时序子图并安全保存。
     ``render_canonical``: 按时期和行块绘制标准 HDF5 散点时序子图。
+    ``render_canonical_grid``: 按时期生成临时规则栅格并绘制标准 HDF5。
     ``main``: 执行配置加载、数据读取和绘图。
 """
 
@@ -30,6 +31,9 @@ import pandas as pd
 import pygmt
 from pyproj import CRS
 from pyproj.exceptions import CRSError
+import rasterio
+from rasterio.transform import from_origin
+from rasterio.windows import Window
 
 from geodesy_visualization.io import (
     get_optional,
@@ -42,6 +46,7 @@ from geodesy_visualization.io import (
     parse_csv_strings,
     resolve_output_path,
     resolve_path,
+    temporary_path,
     validate_config_keys,
     validate_numeric_range,
 )
@@ -61,7 +66,8 @@ DEFAULT_CONFIG = (
 
 
 ALLOWED_KEYS = {
-    "data_source", "data_file", "dates_file", "canonical_unit", "canonical_crs",
+    "data_source", "render_mode", "data_file", "dates_file", "canonical_unit",
+    "canonical_crs", "grid_interpolation", "grid_transparency",
     "output_dir", "output_file", "region_west", "region_east",
     "region_south", "region_north", "projection", "subplot_rows", "subplot_columns",
     "panel_margin_x", "panel_margin_y", "canvas_margin", "start_epoch", "end_epoch",
@@ -117,15 +123,31 @@ def load_config(config_file: str) -> dict[str, object]:
         ("table", "canonical"),
         "data_source",
     )
+    render_mode = parse_choice(
+        get_optional(raw, "render_mode", "scatter"),
+        ("scatter", "grid", "auto"),
+        "render_mode",
+    )
+    if data_source == "table" and render_mode == "grid":
+        raise ValueError("render_mode=grid requires data_source=canonical")
     dates_value = get_optional(raw, "dates_file", "")
     if data_source == "table" and not dates_value:
         raise ValueError("dates_file is required when data_source=table")
     cfg = {
         "data_source": data_source,
+        "render_mode": render_mode,
         "data_file": resolve_path(get_required(raw, "data_file"), base),
         "dates_file": resolve_path(dates_value, base) if dates_value else "",
         "canonical_unit": get_optional(raw, "canonical_unit", "mm"),
         "canonical_crs": get_optional(raw, "canonical_crs", "EPSG:4326"),
+        "grid_interpolation": parse_choice(
+            get_optional(raw, "grid_interpolation", "n"),
+            ("n", "l", "b", "c"),
+            "grid_interpolation",
+        ),
+        "grid_transparency": parse_int(
+            get_optional(raw, "grid_transparency", ""), 0
+        ),
         "output": resolve_output_path(get_optional(raw, "output_file", "deformation_timeseries_map.png"), output_dir, base),
         "region": region,
         "projection": get_optional(raw, "projection", "M4i"),
@@ -223,6 +245,8 @@ def load_config(config_file: str) -> dict[str, object]:
             raise ValueError(f"{key} must be positive")
     if cfg["output_dpi"] <= 0:
         raise ValueError("output_dpi must be positive")
+    if not 0 <= cfg["grid_transparency"] <= 100:
+        raise ValueError("grid_transparency must be between 0 and 100")
     if cfg["start_epoch"] < 1 or cfg["end_epoch"] < cfg["start_epoch"]:
         raise ValueError("epochs use one-based indexing and require end_epoch >= start_epoch")
     if cfg["end_epoch"] - cfg["start_epoch"] + 1 > cfg["rows"] * cfg["columns"]:
@@ -620,6 +644,125 @@ def render_canonical(
     return destination
 
 
+def _regular_axis_step(axis: np.ndarray, name: str) -> float:
+    """Return one regular nonzero axis spacing or reject unsuitable grid input."""
+    if axis.size < 2:
+        raise ValueError(f"grid rendering requires at least two {name} coordinates")
+    differences = np.diff(axis)
+    step = float(differences[0])
+    tolerance = max(abs(step) * 1e-6, np.finfo(float).eps * 16)
+    if not np.allclose(differences, step, rtol=1e-6, atol=tolerance):
+        raise ValueError(f"grid rendering requires a regularly spaced {name} axis")
+    return step
+
+
+def _canonical_raster_layout(
+    selection: CanonicalGridSelection,
+) -> tuple[object, bool, bool]:
+    """Build a north-up pixel transform and identify required axis reversals."""
+    if selection.metadata.grid_registration != "pixel":
+        raise ValueError(
+            "grid rendering currently requires canonical grid_registration=pixel"
+        )
+    x_step = _regular_axis_step(selection.x, "x")
+    y_step = _regular_axis_step(selection.y, "y")
+    x_resolution = abs(x_step)
+    y_resolution = abs(y_step)
+    transform = from_origin(
+        float(np.min(selection.x)) - x_resolution / 2,
+        float(np.max(selection.y)) + y_resolution / 2,
+        x_resolution,
+        y_resolution,
+    )
+    return transform, x_step < 0, y_step > 0
+
+
+def _canonical_grid_is_supported(selection: CanonicalGridSelection) -> bool:
+    """Report whether the current lossless temporary-raster path supports a grid."""
+    try:
+        _canonical_raster_layout(selection)
+    except ValueError:
+        return False
+    return True
+
+
+def render_canonical_grid(
+    cfg: dict[str, object],
+    selection: CanonicalGridSelection,
+) -> Path:
+    """Render canonical epochs through bounded temporary GeoTIFF row writes."""
+    transform, reverse_x, reverse_y = _canonical_raster_layout(selection)
+    block_iterator = iter(iter_canonical_grid_blocks(
+        selection,
+        chunk_rows=int(cfg["chunk_rows"]),
+    ))
+    pending = next(block_iterator, None)
+
+    def draw_data(figure: object, index: int) -> None:
+        """Write and draw one epoch while retaining only one row block in memory."""
+        nonlocal pending
+        expected_epoch = selection.epoch_indices[index]
+        if pending is None or pending.epoch_index != expected_epoch:
+            raise RuntimeError(
+                f"canonical row blocks are missing epoch index {expected_epoch}"
+            )
+        output_parent = Path(str(cfg["output"])).parent
+        with temporary_path(output_parent, ".tif") as temporary_raster:
+            with rasterio.open(
+                temporary_raster,
+                "w",
+                driver="GTiff",
+                width=selection.columns,
+                height=selection.rows,
+                count=1,
+                dtype="float32",
+                crs=selection.metadata.crs,
+                transform=transform,
+                nodata=np.nan,
+                compress="deflate",
+                predictor=3,
+                BIGTIFF="IF_SAFER",
+            ) as dataset:
+                while pending is not None and pending.epoch_index == expected_epoch:
+                    values = np.array(pending.values, dtype=np.float32, copy=True)
+                    values[~pending.valid_mask] = np.nan
+                    values *= np.float32(cfg["scale"])
+                    if reverse_x:
+                        values = np.fliplr(values)
+                    destination_row = pending.row_start
+                    if reverse_y:
+                        values = np.flipud(values)
+                        destination_row = selection.rows - pending.row_stop
+                    dataset.write(
+                        values,
+                        1,
+                        window=Window(
+                            0,
+                            destination_row,
+                            selection.columns,
+                            pending.row_stop - pending.row_start,
+                        ),
+                    )
+                    pending = next(block_iterator, None)
+            figure.grdimage(
+                grid=str(temporary_raster),
+                region=cfg["region"],
+                projection=str(cfg["projection"]),
+                cmap=True,
+                nan_transparent=True,
+                interpolation=str(cfg["grid_interpolation"]),
+                transparency=int(cfg["grid_transparency"]),
+            )
+
+    try:
+        destination = _render_panels(cfg, list(selection.dates), draw_data)
+    finally:
+        block_iterator.close()
+    if pending is not None:
+        raise RuntimeError("canonical grid renderer did not consume every row block")
+    return destination
+
+
 def main() -> None:
     """Load one cfg, read the selected epochs and render the time-series map."""
     cfg = load_config(build_parser().parse_args().config)
@@ -638,7 +781,16 @@ def main() -> None:
             expected_unit=str(cfg["canonical_unit"]),
             expected_crs=str(cfg["canonical_crs"]),
         )
-        destination = render_canonical(cfg, selection)
+        render_mode = str(cfg["render_mode"])
+        if render_mode == "auto":
+            render_mode = (
+                "grid" if _canonical_grid_is_supported(selection) else "scatter"
+            )
+        destination = (
+            render_canonical_grid(cfg, selection)
+            if render_mode == "grid"
+            else render_canonical(cfg, selection)
+        )
     print(f"Saved: {destination}")
 
 
@@ -651,6 +803,7 @@ __all__ = [
     "main",
     "render",
     "render_canonical",
+    "render_canonical_grid",
 ]
 
 
