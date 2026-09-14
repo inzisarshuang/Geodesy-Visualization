@@ -13,6 +13,8 @@ geodesy_visualization.styles
         将具名前缀的字体 cfg 解析为 GMT 配置字典。
     ``resolve_cpt_reference``:
         区分 GMT 内置色标名称与相对 cfg 的 CPT 文件引用。
+    ``colorbar_metadata_keys`` / ``parse_colorbar_metadata``:
+        定义并解析共享色标开关、标签和单位，不接管工作流专用几何。
 """
 
 from __future__ import annotations
@@ -80,4 +82,37 @@ def resolve_cpt_reference(value: str, base_dir: str | Path) -> str:
     return str(path.resolve())
 
 
-__all__ = ["font_style_keys", "parse_font_style", "resolve_cpt_reference"]
+def colorbar_metadata_keys(prefix: str = "") -> set[str]:
+    """Return shared cfg keys for one optionally prefixed colorbar identity."""
+    normalized = str(prefix).strip()
+    scoped = f"{normalized}_" if normalized else ""
+    return {"add_colorbar", f"{scoped}colorbar_label", f"{scoped}colorbar_unit"}
+
+
+def parse_colorbar_metadata(
+    cfg: Mapping[str, str],
+    prefix: str,
+    *,
+    enabled: bool,
+    default_label: str,
+    default_unit: str,
+) -> dict[str, str | bool]:
+    """Parse shared colorbar identity while leaving geometry workflow-owned."""
+    normalized = str(prefix).strip()
+    scoped = f"{normalized}_" if normalized else ""
+    label_key = f"{scoped}colorbar_label"
+    unit_key = f"{scoped}colorbar_unit"
+    return {
+        "add_colorbar": bool(enabled),
+        label_key: str(cfg.get(label_key, default_label)).strip(),
+        unit_key: str(cfg.get(unit_key, default_unit)).strip(),
+    }
+
+
+__all__ = [
+    "colorbar_metadata_keys",
+    "font_style_keys",
+    "parse_colorbar_metadata",
+    "parse_font_style",
+    "resolve_cpt_reference",
+]

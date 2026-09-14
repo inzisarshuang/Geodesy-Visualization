@@ -59,7 +59,9 @@ from geodesy_visualization.io import (
     validate_numeric_range,
 )
 from geodesy_visualization.styles import (
+    colorbar_metadata_keys,
     font_style_keys,
+    parse_colorbar_metadata,
     parse_font_style,
     resolve_cpt_reference,
 )
@@ -77,12 +79,13 @@ ALLOWED_KEYS = {
     "input_dir", "output_dir", "projection", "region_west", "region_east", "region_south", "region_north",
     "dem_tif", "optic_tif", "dem_cpt", "dem_bar_min", "dem_bar_max", "defo_cpt",
     "defo_cpt_reverse", "defo_bar_min", "defo_bar_max", "defo_transparency",
-    "defo_colorbar_label", "defo_colorbar_unit", "defo_unit", "scatter_style", "scatter_pen",
-    "add_colorbar", "add_scale", "map_scale", "map_scale_box", "map_scale_height",
+    "defo_unit", "scatter_style", "scatter_pen", "add_scale", "map_scale",
+    "map_scale_box", "map_scale_height",
     "map_scale_font_annot", "map_scale_font_label", "add_rose", "target_regions",
     "target_region_pen", "target_region_label_font", "target_region_label_offset",
     "target_region_center_style", "output_defo", "defo_basemap_mode",
 }
+ALLOWED_KEYS.update(colorbar_metadata_keys("defo"))
 for _style_prefix in ("default", "map"):
     ALLOWED_KEYS.update(font_style_keys(_style_prefix))
 for _prefix in ("sbas", "psi"):
@@ -288,8 +291,13 @@ def load_config(config_path: str) -> dict:
         "dem_bar_min": parse_float(get_optional(cfg, "dem_bar_min", ""), 700.0),
         "dem_bar_max": parse_float(get_optional(cfg, "dem_bar_max", ""), 2300.0),
         "defo_transparency": int(parse_float(get_optional(cfg, "defo_transparency", ""), 25.0)),
-        "defo_colorbar_label": get_optional(cfg, "defo_colorbar_label", "Deformation"),
-        "defo_colorbar_unit": get_optional(cfg, "defo_colorbar_unit", get_optional(cfg, "defo_unit", "m/yr")),
+        **parse_colorbar_metadata(
+            cfg,
+            "defo",
+            enabled=parse_bool(get_optional(cfg, "add_colorbar", ""), True),
+            default_label="Deformation",
+            default_unit=get_optional(cfg, "defo_unit", "m/yr"),
+        ),
         "target_regions": parse_target_regions(cfg),
         "target_region_pen": get_optional(cfg, "target_region_pen", "1.5p,black"),
         "target_region_label_font": get_optional(cfg, "target_region_label_font", "12p,Helvetica-Bold,black"),
@@ -297,7 +305,6 @@ def load_config(config_path: str) -> dict:
         "target_region_center_style": get_optional(cfg, "target_region_center_style", "c0.08c"),
         "scatter_style": get_optional(cfg, "scatter_style", "c0.08c"),
         "scatter_pen": get_optional(cfg, "scatter_pen", "0.01p,white"),
-        "add_colorbar": parse_bool(get_optional(cfg, "add_colorbar", ""), True),
         "add_scale": parse_bool(get_optional(cfg, "add_scale", ""), True),
         "map_scale": get_optional(cfg, "map_scale", "JTC+o0c/4c+w10k+f+u"),
         "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p2p+c20p/20p"),

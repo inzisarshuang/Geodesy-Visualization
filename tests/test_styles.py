@@ -11,7 +11,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from geodesy_visualization.styles import (
+    colorbar_metadata_keys,
     font_style_keys,
+    parse_colorbar_metadata,
     parse_font_style,
     resolve_cpt_reference,
 )
@@ -68,6 +70,27 @@ class FontStyleContractTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "must not be empty"):
             resolve_cpt_reference(" ", base)
+
+    def test_parses_prefixed_and_unprefixed_colorbar_metadata(self) -> None:
+        """Share identity keys without absorbing workflow-specific geometry."""
+        self.assertEqual(
+            colorbar_metadata_keys("defo"),
+            {"add_colorbar", "defo_colorbar_label", "defo_colorbar_unit"},
+        )
+        self.assertEqual(
+            parse_colorbar_metadata(
+                {"colorbar_label": "Velocity", "colorbar_unit": "mm/yr"},
+                "",
+                enabled=False,
+                default_label="Deformation",
+                default_unit="mm",
+            ),
+            {
+                "add_colorbar": False,
+                "colorbar_label": "Velocity",
+                "colorbar_unit": "mm/yr",
+            },
+        )
 
 
 if __name__ == "__main__":

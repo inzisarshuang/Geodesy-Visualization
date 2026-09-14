@@ -51,7 +51,9 @@ from geodesy_visualization.io import (
     validate_numeric_range,
 )
 from geodesy_visualization.styles import (
+    colorbar_metadata_keys,
     font_style_keys,
+    parse_colorbar_metadata,
     parse_font_style,
     resolve_cpt_reference,
 )
@@ -84,11 +86,11 @@ ALLOWED_KEYS = {
     "coordinate_format", "show_coordinate_grid", "font_reference_panel_width",
     "font_scale", "font_family", "font_bold", "panel_title_font_size", "panel_number_font_size",
     "coordinate_font_size", "colorbar_annotation_font_size", "colorbar_label_font_size",
-    "chunk_rows", "nan_tokens", "add_colorbar", "colorbar_label", "colorbar_unit",
-    "colorbar_interval",
+    "chunk_rows", "nan_tokens", "colorbar_interval",
     "colorbar_width", "colorbar_height", "colorbar_offset", "colorbar_box",
     "output_dpi",
 }
+ALLOWED_KEYS.update(colorbar_metadata_keys())
 ALLOWED_KEYS.update(font_style_keys("default", include_secondary=True))
 
 
@@ -211,9 +213,13 @@ def load_config(config_file: str) -> dict[str, object]:
         ),
         "chunk_rows": parse_int(get_optional(raw, "chunk_rows", ""), 250_000),
         "nan_tokens": parse_csv_strings(get_optional(raw, "nan_tokens", "nan,NaN,-9999")),
-        "add_colorbar": parse_bool(get_optional(raw, "add_colorbar", ""), True),
-        "colorbar_label": get_optional(raw, "colorbar_label", "Deformation"),
-        "colorbar_unit": get_optional(raw, "colorbar_unit", "mm"),
+        **parse_colorbar_metadata(
+            raw,
+            "",
+            enabled=parse_bool(get_optional(raw, "add_colorbar", ""), True),
+            default_label="Deformation",
+            default_unit="mm",
+        ),
         "colorbar_interval": parse_float(
             get_optional(raw, "colorbar_interval", ""), 10.0
         ),

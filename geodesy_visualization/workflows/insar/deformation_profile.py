@@ -56,7 +56,9 @@ from geodesy_visualization.io import (
     validate_same_length,
 )
 from geodesy_visualization.styles import (
+    colorbar_metadata_keys,
     font_style_keys,
+    parse_colorbar_metadata,
     parse_font_style,
     resolve_cpt_reference,
 )
@@ -71,7 +73,7 @@ DEFAULT_CONFIG = (
 ALLOWED_KEYS = {
     "output_dir", "projection", "dem_tif", "dem_cpt", "dem_bar_min", "dem_bar_max",
     "defo_cpt", "defo_cpt_reverse", "defo_bar_min", "defo_bar_max", "defo_transparency",
-    "defo_colorbar_label", "defo_colorbar_unit", "add_colorbar", "add_scale", "map_scale",
+    "add_scale", "map_scale",
     "map_scale_box", "map_scale_height", "map_scale_font_annot", "map_scale_font_label",
     "add_rose", "track_start_coords", "track_end_coords", "track_names", "track_num_points",
     "track_line_pen", "track_label_font", "track_start_justify", "track_end_justify",
@@ -80,6 +82,7 @@ ALLOWED_KEYS = {
     "profile_x_label", "profile_y_label", "profile_padding", "profile_projection",
     "profile_legend_position", "profile_legend_box",
 }
+ALLOWED_KEYS.update(colorbar_metadata_keys("defo"))
 for _style_prefix in ("default", "map", "profile"):
     ALLOWED_KEYS.update(font_style_keys(_style_prefix))
 for _prefix in ("dataset1", "dataset2"):
@@ -192,8 +195,13 @@ def load_config(config_path: str) -> dict:
         "defo_bar_min": parse_float(get_optional(cfg, "defo_bar_min", ""), -0.1),
         "defo_bar_max": parse_float(get_optional(cfg, "defo_bar_max", ""), 0.1),
         "defo_transparency": int(parse_float(get_optional(cfg, "defo_transparency", ""), 25.0)),
-        "defo_colorbar_label": get_optional(cfg, "defo_colorbar_label", "Deformation"),
-        "defo_colorbar_unit": get_optional(cfg, "defo_colorbar_unit", "m/yr"),
+        **parse_colorbar_metadata(
+            cfg,
+            "defo",
+            enabled=parse_bool(get_optional(cfg, "add_colorbar", ""), True),
+            default_label="Deformation",
+            default_unit="m/yr",
+        ),
         "num_points": parse_int(get_optional(cfg, "track_num_points", ""), 100),
         "track_start_coords": start_coords,
         "track_end_coords": end_coords,
@@ -201,7 +209,6 @@ def load_config(config_path: str) -> dict:
         "output_dir": output_dir,
         "line_profiles": parse_bool(get_optional(cfg, "export_line_profiles", ""), True),
         "scatter_profiles": parse_bool(get_optional(cfg, "export_scatter_profiles", ""), True),
-        "add_colorbar": parse_bool(get_optional(cfg, "add_colorbar", ""), True),
         "add_scale": parse_bool(get_optional(cfg, "add_scale", ""), True),
         "map_scale": get_optional(cfg, "map_scale", "JTC+o0c/4c+w10k+f+u"),
         "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p2p+c20p/20p"),

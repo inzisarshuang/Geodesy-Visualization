@@ -44,6 +44,10 @@ specifications dynamically.
   different map/profile/panel geometries are modeled explicitly.<br>
   色标开关、标签和单位具有共享语义；位置、宽高、间隔和边框在不同几何模型
   明确建模前仍属工作流专用。
+  These three metadata values are normalized by `parse_colorbar_metadata`;
+  dataset-specific figures use a prefix such as `defo`, while a single-value
+  figure uses the unprefixed keys.<br>这三项元数据由 `parse_colorbar_metadata`
+  统一归一化；多数据类型图件使用 `defo` 等前缀，单值图件使用无前缀键。
 - CPT path/name and reverse flag have shared semantics. Dataset prefixes such as
   `defo_` and `dem_` remain necessary because one figure can use both.<br>
   CPT 路径/名称和反转开关语义相同；同图可同时使用形变与 DEM，因此保留数据集前缀。
