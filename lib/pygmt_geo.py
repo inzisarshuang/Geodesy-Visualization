@@ -40,13 +40,12 @@ import rasterio
 from insar_data_adapter import (
     DefsourMetadata,
     DefsourPointSource,
+    GeoTiffValueMetadata,
     HeaderedPointTableSource,
     PointValueMetadata,
+    convert_geotiff_raster,
 )
 from pyproj import CRS
-from rasterio.enums import Resampling
-from rasterio.transform import array_bounds
-from rasterio.warp import calculate_default_transform, reproject
 
 from geodesy_visualization.io import gmt_grdconvert, replace_dataset, temporary_path
 
@@ -136,66 +135,49 @@ def tif2grd(
     scale: float = 1.0,
     nan_to_zero: bool = True,
     target_crs: str | None = "EPSG:4326",
+    metadata: GeoTiffValueMetadata | None = None,
+    source_crs_override: str | None = None,
 ) -> List[float]:
-    """Convert one GeoTIFF band to a scaled GMT grid, optionally reprojecting it."""
+    """Prepare a GMT grid from one Adapter-converted temporary GeoTIFF."""
     source = Path(tif_path).expanduser().resolve()
     output = Path(grd_path).expanduser().resolve()
     if not source.is_file():
         raise FileNotFoundError(f"input GeoTIFF not found: {source}")
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    with rasterio.open(source) as src:
-        if src.count < 1:
-            raise ValueError(f"input GeoTIFF has no raster bands: {source}")
-        destination_crs = CRS.from_user_input(target_crs) if target_crs else src.crs
-        if destination_crs is None:
-            raise ValueError(f"input GeoTIFF has no CRS and target_crs was not provided: {source}")
-        if src.crs is not None and CRS.from_user_input(src.crs) != destination_crs:
-            transform, width, height = calculate_default_transform(
-                src.crs, destination_crs, src.width, src.height, *src.bounds
-            )
-        else:
-            transform, width, height = src.transform, src.width, src.height
-        left, bottom, right, top = array_bounds(height, width, transform)
-        region = [left, right, bottom, top]
-        profile = src.profile.copy()
-        profile.update(
-            count=1,
-            width=width,
-            height=height,
-            transform=transform,
-            crs=destination_crs,
-            dtype=rasterio.float32,
-            nodata=0 if nan_to_zero else np.nan,
+    if metadata is None:
+        metadata = GeoTiffValueMetadata(
+            input_unit="unspecified by legacy visualization config",
+            output_unit="unspecified by legacy visualization config",
+            value_quantity="unspecified by legacy visualization config",
+            los_positive="unspecified by legacy visualization config",
+            nodata_policy=(
+                "source nodata becomes zero" if nan_to_zero else "source nodata becomes NaN"
+            ),
+            temporal_reference="unspecified by legacy visualization config",
+            spatial_reference="unspecified by legacy visualization config",
+            source_provenance=str(source),
         )
+    elif not isinstance(metadata, GeoTiffValueMetadata):
+        raise TypeError("metadata must be a GeoTiffValueMetadata instance")
 
-        with temporary_path(output.parent, ".tif") as temporary_tif:
-            with rasterio.open(temporary_tif, "w", **profile) as dst:
-                reproject(
-                    source=rasterio.band(src, 1),
-                    destination=rasterio.band(dst, 1),
-                    src_transform=src.transform,
-                    src_crs=src.crs or destination_crs,
-                    src_nodata=src.nodata,
-                    dst_transform=transform,
-                    dst_crs=destination_crs,
-                    dst_nodata=profile["nodata"],
-                    resampling=Resampling.bilinear,
-                )
-            with rasterio.open(temporary_tif, "r+") as dst:
-                for _, window in dst.block_windows(1):
-                    data = dst.read(1, window=window, masked=True).astype("float32")
-                    scaled = data.filled(np.nan) * np.float32(scale)
-                    if nan_to_zero:
-                        scaled = np.nan_to_num(scaled, nan=0.0)
-                    dst.write(scaled.astype("float32", copy=False), 1, window=window)
-
-            with temporary_path(output.parent, output.suffix or ".grd") as temporary_grd:
-                gmt_grdconvert(str(temporary_tif), str(temporary_grd))
-                replace_dataset(temporary_grd, output)
+    with temporary_path(output.parent, ".tif") as temporary_tif:
+        result = convert_geotiff_raster(
+            source,
+            temporary_tif,
+            metadata,
+            target_crs=target_crs,
+            source_crs_override=source_crs_override,
+            scale=scale,
+            nan_to_zero=nan_to_zero,
+            resampling="bilinear",
+        )
+        with temporary_path(output.parent, output.suffix or ".grd") as temporary_grd:
+            gmt_grdconvert(str(temporary_tif), str(temporary_grd))
+            replace_dataset(temporary_grd, output)
 
     print(f"Converted to GRD: {output}")
-    return region
+    return list(result.region)
 
 
 def txt2grd(

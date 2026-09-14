@@ -121,8 +121,8 @@ class GridConversionTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
 
-    def test_converts_tif_by_windows_and_text_by_chunks(self) -> None:
-        """Convert raster and table inputs without leaving temporary files behind."""
+    def test_converts_tif_through_adapter(self) -> None:
+        """Convert a raster through Adapter without leaving temporary files behind."""
         tif_path = self.root / "input.tif"
         with rasterio.open(
             tif_path,
@@ -142,6 +142,9 @@ class GridConversionTests(unittest.TestCase):
         region = tif2grd(str(tif_path), str(tif_grid), scale=2.0, nan_to_zero=False)
         self.assertEqual(region, [10.0, 12.0, 10.0, 12.0])
         self.assertTrue(tif_grid.is_file())
+
+    def test_converts_headered_text_by_chunks(self) -> None:
+        """Convert a headered point table without leaving temporary files behind."""
 
         text_path = self.root / "points.txt"
         text_path.write_text("lon lat value\n0 0 1\n1 0 2\n0 1 3\n1 1 4\n", encoding="utf-8")
