@@ -14,7 +14,9 @@ OWNERSHIP_MAP = REPOSITORY_ROOT / "docs" / "development" / "pygmt_geo_ownership.
 
 EXPECTED_LEGACY_GEO_IMPORTS = {}
 
-EXPECTED_PACKAGE_GEO_IMPORTS = {
+EXPECTED_PACKAGE_GEO_IMPORTS = {}
+
+EXPECTED_GRID_PREPARATION_IMPORTS = {
     "geodesy_visualization/workflows/insar/deformation_map.py": {
         "prepare_dataset_grid",
     },
@@ -92,6 +94,10 @@ class OwnershipMapTests(unittest.TestCase):
         self.assertEqual(
             production_imports("geodesy_visualization.geo"),
             EXPECTED_CANONICAL_GEO_IMPORTS,
+        )
+        self.assertEqual(
+            production_imports("geodesy_visualization.grid_preparation"),
+            EXPECTED_GRID_PREPARATION_IMPORTS,
         )
 
 

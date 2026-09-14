@@ -36,8 +36,8 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 cpt_path = REPOSITORY_ROOT / "cpt"
 
-from lib.pygmt_geo import prepare_dataset_grid
 from geodesy_visualization.geo import extract_profile, generate_tracks, region_from_grd
+from geodesy_visualization.grid_preparation import prepare_dataset_grid
 from geodesy_visualization.io import (
     get_optional,
     get_required,

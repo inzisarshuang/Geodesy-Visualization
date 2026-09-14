@@ -26,6 +26,7 @@ from geodesy_visualization.geo import (
     generate_tracks as canonical_generate_tracks,
     region_from_grd as canonical_region_from_grd,
 )
+from geodesy_visualization import grid_preparation as canonical_grid_preparation
 from pygmt_geo import add_tifs, defsour2grd, generate_tracks, tif2grd, txt2grd
 
 
@@ -83,9 +84,10 @@ class AddTifsTests(unittest.TestCase):
 
 
 class TrackTests(unittest.TestCase):
-    def test_transitional_module_supports_package_qualified_import(self) -> None:
-        """Allow canonical workflows to import the mixed boundary without sys.path edits."""
-        self.assertTrue(callable(package_geo.prepare_dataset_grid))
+    def test_transitional_module_reexports_grid_preparation(self) -> None:
+        """Keep legacy preparation names bound to their canonical package functions."""
+        for name in canonical_grid_preparation.__all__:
+            self.assertIs(getattr(package_geo, name), getattr(canonical_grid_preparation, name))
         self.assertIs(package_geo.region_from_grd, canonical_region_from_grd)
 
     def test_legacy_module_reexports_canonical_view_functions(self) -> None:

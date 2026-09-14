@@ -39,8 +39,8 @@ import re
 from pathlib import Path
 import numpy as np
 
-from lib.pygmt_geo import prepare_dataset_grid
 from geodesy_visualization.geo import region_from_grd
+from geodesy_visualization.grid_preparation import prepare_dataset_grid
 from geodesy_visualization.io import (
     get_optional,
     get_required,

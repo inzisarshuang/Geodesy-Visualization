@@ -37,11 +37,11 @@ tests and documentation.
 |---|---|---|---|
 | `add_tifs` | none | `analysis-candidate` | Keep in place. Move to Geodesy-Analysis only if a real workflow adopts it; otherwise deprecate after a separate usage review. |
 | `region_from_grd` | `geodesy_visualization.workflows.insar.deformation_map`, `geodesy_visualization.workflows.insar.deformation_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; the legacy module re-exports the same function object. |
-| `tif2grd` | internal only | `visualization-view` | Adapter 0.11 owns explicit source/target CRS, bilinear reprojection, nodata, scaling, provenance, and atomic temporary GeoTIFF output. This compatibility function retains only temporary GMT conversion; unreferenced inputs now require an explicit source CRS override instead of assuming the target CRS. |
-| `txt2grd` | internal only | `visualization-view` | Adapter 0.10 owns named headers, column roles, bounded parsing, metadata, point order, and optional CRS conversion. This compatibility function retains display scaling and temporary GMT gridding; legacy cfg metadata is explicitly unspecified rather than inferred. |
-| `defsour2grd` | internal only | `visualization-view` | Adapter 0.9 owns bounded Defsour parsing, explicit column roles, point order, metadata, and CRS conversion. This compatibility function retains only display scaling and temporary GMT gridding. Existing cfg files receive an honest `unspecified by legacy visualization config` metadata record instead of inferred science; callers may already pass complete `DefsourMetadata` before the shared cfg contract is migrated. Formal persistent GRD export remains a separate Adapter phase. |
-| `prepare_grid` | internal only | `visualization-view` | Later become a source-neutral view-preparation dispatcher; retain existing cfg aliases during transition. |
-| `prepare_dataset_grid` | `geodesy_visualization.workflows.insar.deformation_map`, `geodesy_visualization.workflows.insar.deformation_profile` | `visualization-view` | Preserve as the workflow compatibility boundary while the three conversion branches are separated; package workflows use the qualified `lib.pygmt_geo` import. |
+| `tif2grd` | internal only | `visualization-view` | Canonical implementation moved to `geodesy_visualization.grid_preparation`; Adapter 0.11 owns GeoTIFF adaptation, while Visualization owns only temporary GMT conversion. Legacy module re-exports the same function object. |
+| `txt2grd` | internal only | `visualization-view` | Canonical implementation moved to `geodesy_visualization.grid_preparation`; Adapter 0.10 owns named point ingestion, while Visualization owns display scaling and temporary GMT gridding. |
+| `defsour2grd` | internal only | `visualization-view` | Canonical implementation moved to `geodesy_visualization.grid_preparation`; Adapter 0.9 owns Defsour ingestion/CRS conversion, while Visualization owns display scaling and temporary GMT gridding. |
+| `prepare_grid` | internal only | `visualization-view` | Canonical source-neutral dispatcher moved to `geodesy_visualization.grid_preparation`; legacy module re-exports it. |
+| `prepare_dataset_grid` | `geodesy_visualization.workflows.insar.deformation_map`, `geodesy_visualization.workflows.insar.deformation_profile` | `visualization-view` | Canonical dataset dispatcher moved to `geodesy_visualization.grid_preparation`; both workflows import the package path and the legacy module re-exports it. |
 | `generate_tracks` | `geodesy_visualization.workflows.insar.deformation_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; keep it figure-oriented unless tracks become persisted scientific products. |
 | `extract_profile` | `geodesy_visualization.workflows.insar.deformation_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; keep it figure-oriented unless sampled values become a reusable/exported analysis result. |
 
@@ -50,20 +50,15 @@ part of the public compatibility surface.
 
 私有函数 `_validate_matching_grids` 随 `add_tifs` 归属，不属于公共兼容接口。
 
-## Safe Migration Order / 安全迁移顺序
+## Remaining Decision / 剩余决策
 
-1. Move the remaining `prepare_grid` and `prepare_dataset_grid` view dispatchers
-   behind a package API only after their adapter-gated branches are separated.
-2. Leave `adapter-gated` functions active until Data-Adapter owns equivalent
-   source and persistent-output contracts.
-3. Split persistent conversion from temporary plotting grids and run shadow
-   numerical comparisons before redirecting callers.
-4. Decide `add_tifs` from an Analysis use case; do not include it in either move
-   by convenience.
+All source adaptation and renderer-specific grid preparation functions have
+passed their Adapter gates and moved behind formal package APIs. The only local
+implementation left in this compatibility module is `add_tifs`. Decide it from
+a real Geodesy-Analysis use case; otherwise deprecate it after a separate caller
+review. Do not move it into Visualization or Adapter for convenience.
 
-1. 只有在受 Adapter 前置条件约束的分支完成拆分后，才把剩余的
-   `prepare_grid` 和 `prepare_dataset_grid` 视图调度器迁入包 API。
-2. 在 Data-Adapter 具备等价来源与持久输出契约前，保持 `adapter-gated`
-   函数原位生效。
-3. 分开持久格式转换与绘图临时制网，完成影子数值对比后才切换调用者。
-4. 根据真实 Analysis 用例决定 `add_tifs` 去留，不为迁移方便而随意归类。
+所有来源适配和渲染专用网格准备函数均已通过 Adapter 门槛并迁至正式 package
+API。本兼容模块中唯一保留的本地实现为 `add_tifs`。后续应根据真实
+Geodesy-Analysis 用例决定其归属；若无调用者，则在单独审查后弃用，不能为迁移
+方便而放入 Visualization 或 Adapter。
