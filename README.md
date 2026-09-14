@@ -30,8 +30,10 @@ PyGMT-Plotter/
 │   │   ├── deformation_profile.py    # canonical deformation-profile workflow / 正式形变剖面流程
 │   │   ├── timeseries_aux.py         # canonical auxiliary-series workflow / 正式辅助时序流程
 │   │   └── timeseries_map.py         # canonical spatial time-series workflow / 正式空间时序流程
-│   └── backends/
-│       └── pygmt.py                  # canonical PyGMT backend / 正式 PyGMT 后端
+│   ├── backends/
+│   │   ├── matplotlib.py             # canonical Matplotlib backend / 正式 Matplotlib 后端
+│   │   └── pygmt.py                  # canonical PyGMT backend / 正式 PyGMT 后端
+│   └── fonts/                        # bundled publication fonts / 内置论文绘图字体
 ├── lib/
 │   ├── pygmt_io.py                   # compatibility import / 兼容导入
 │   ├── pygmt_geo.py                  # spatial processing / 空间处理
@@ -94,6 +96,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: compatibility re-export for grid preparation and geo views; the unused scientific `add_tifs` remains temporarily as a deprecated compatibility API.<br>临时网格准备和地理视图的兼容重导出；无生产调用的科学运算 `add_tifs` 暂作为已弃用兼容 API 保留。
 - `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
+- `geodesy_visualization/backends/matplotlib.py`: analysis-neutral array panels, target-series figures, InSAR/GNSS comparison composition, and bundled-font registration.<br>正式负责与 Analysis 解耦的数组子图、目标时序图、InSAR/GNSS 对比图组合及内置字体注册。
 - `geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
 - `geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。
 - `geodesy_visualization/workflows/insar/deformation_map.py`: canonical cfg-driven DEM/optical deformation-map orchestration using formal package grid preparation.<br>正式的 cfg 驱动 DEM/光学形变地图编排，直接使用正式 package 临时网格准备接口。
@@ -108,7 +111,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - Python 3.10 or newer; the recommended Conda environment name is `envPlot`.<br>Python 3.10 或更高版本，推荐 Conda 环境名为 `envPlot`。
 - GMT and PyGMT for map and grid operations.<br>GMT 与 PyGMT，用于地图和网格操作。
 - GDAL with `gdal_translate` available on `PATH`.<br>GDAL，并确保 `gdal_translate` 位于 `PATH`。
-- Rasterio, PyProj, NumPy, Pandas, and `insar-data-adapter>=0.11.0` for GeoTIFF adaptation, tabular point-source, Defsour, and canonical-HDF5 access.<br>Rasterio、PyProj、NumPy、Pandas 及 `insar-data-adapter>=0.11.0`，用于 GeoTIFF 适配、带表头点来源、Defsour 和标准 HDF5 访问。
+- Rasterio, PyProj, NumPy, Pandas, Matplotlib, and `insar-data-adapter>=0.11.0` for GeoTIFF adaptation, tabular point-source, Defsour, canonical-HDF5 access, and engine-neutral scientific figures.<br>Rasterio、PyProj、NumPy、Pandas、Matplotlib 及 `insar-data-adapter>=0.11.0`，用于 GeoTIFF 适配、带表头点来源、Defsour、标准 HDF5 访问及绘图引擎中立的科研图件。
 
 ### 3.2 Installation / 安装方法
 

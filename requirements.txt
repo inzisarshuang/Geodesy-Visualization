@@ -2,6 +2,7 @@
 # Conda or the operating system package manager; see README.md.
 numpy
 pandas
+matplotlib
 pygmt
 pyproj
 rasterio

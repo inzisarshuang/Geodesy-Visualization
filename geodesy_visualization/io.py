@@ -8,6 +8,8 @@ geodesy_visualization.io
 
 函数说明:
     文件与外部命令:
+        ``atomic_output_path``:
+            提供同目录唯一临时文件，并在成功后原子替换目标文件。
         ``gdal_translate``:
             使用参数列表调用 GDAL，将栅格转换为指定格式。
         ``gmt_grdconvert``:
@@ -53,6 +55,26 @@ from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from geodesy_visualization.styles import parse_font_style as parse_style_block
+
+
+@contextmanager
+def atomic_output_path(path: str | Path) -> Iterator[Path]:
+    """Yield a sibling temporary path and atomically publish it on success."""
+    destination = Path(path).expanduser().resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.stem}.",
+        suffix=destination.suffix or ".tmp",
+        dir=destination.parent,
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        yield temporary
+        os.replace(temporary, destination)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def gdal_translate(
