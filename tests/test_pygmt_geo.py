@@ -11,6 +11,7 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import rasterio
+from insar_data_adapter import PointValueMetadata
 from rasterio.transform import from_origin
 
 
@@ -177,6 +178,49 @@ class GridConversionTests(unittest.TestCase):
         self.assertTrue(np.allclose(region, [-7.3e-10, 0.9999999993, 0.0, 1.0], atol=1.0e-6))
         self.assertTrue(output.is_file())
         self.assertEqual(list(self.root.glob(".pygmt_*")), [])
+
+    def test_converts_named_headered_points_through_adapter(self) -> None:
+        """Delegate named non-positional TXT roles while preserving display scaling."""
+        source = self.root / "named_points.txt"
+        source.write_text(
+            "id lat velocity lon quality\n"
+            "1 10.0 4.0 20.0 0.9\n"
+            "2 11.0 -2.0 21.0 0.8\n",
+            encoding="utf-8",
+        )
+        output = self.root / "named_points.grd"
+        metadata = PointValueMetadata(
+            source_format="headered_text_points",
+            value_unit="cm/yr",
+            value_quantity="velocity",
+            los_positive="toward_satellite",
+            crs="EPSG:4326",
+            nodata_policy="NaN is nodata; zero is valid",
+            temporal_reference="source velocity interval",
+            spatial_reference="none",
+            source_provenance=str(source),
+        )
+
+        def fake_xyz2grd(*, data, region, spacing, outgrid):
+            """Verify named roles and scaling, then emulate one GMT output."""
+            generated = pd.read_csv(data, sep=r"\s+", header=None)
+            np.testing.assert_allclose(generated.iloc[:, 0], [20.0, 21.0])
+            np.testing.assert_allclose(generated.iloc[:, 1], [10.0, 11.0])
+            np.testing.assert_allclose(generated.iloc[:, 2], [0.04, -0.02])
+            Path(outgrid).write_bytes(b"grid")
+
+        with patch("pygmt_geo.pygmt.xyz2grd", side_effect=fake_xyz2grd):
+            region = txt2grd(
+                str(source),
+                str(output),
+                scale=0.01,
+                space=0.5,
+                chunk_rows=1,
+                value_column="velocity",
+                metadata=metadata,
+            )
+        self.assertEqual(region, [20.0, 21.0, 10.0, 11.0])
+        self.assertTrue(output.is_file())
 
 
 if __name__ == "__main__":

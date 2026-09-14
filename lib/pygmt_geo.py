@@ -37,7 +37,12 @@ import numpy as np
 import pandas as pd
 import pygmt
 import rasterio
-from insar_data_adapter import DefsourMetadata, DefsourPointSource
+from insar_data_adapter import (
+    DefsourMetadata,
+    DefsourPointSource,
+    HeaderedPointTableSource,
+    PointValueMetadata,
+)
 from pyproj import CRS
 from rasterio.enums import Resampling
 from rasterio.transform import array_bounds
@@ -199,8 +204,10 @@ def txt2grd(
     scale: float = 1.0,
     space: float = 0.0005,
     chunk_rows: int = 250_000,
+    value_column: str | None = None,
+    metadata: PointValueMetadata | None = None,
 ) -> List[float]:
-    """Convert a lon/lat/value text table to a GMT grid using chunked reads."""
+    """Prepare a GMT grid from Adapter-validated headered lon/lat point blocks."""
     source = Path(txt_path).expanduser().resolve()
     output = Path(grd_path).expanduser().resolve()
     if not source.is_file():
@@ -210,37 +217,59 @@ def txt2grd(
     if chunk_rows <= 0:
         raise ValueError(f"chunk_rows must be positive; got {chunk_rows}")
     output.parent.mkdir(parents=True, exist_ok=True)
+    if metadata is None:
+        metadata = PointValueMetadata(
+            source_format="headered_text_points",
+            value_unit="unspecified by legacy visualization config",
+            value_quantity="unspecified by legacy visualization config",
+            los_positive="unspecified by legacy visualization config",
+            crs="EPSG:4326",
+            nodata_policy="non-finite coordinates are invalid; zero is valid",
+            temporal_reference="unspecified by legacy visualization config",
+            spatial_reference="unspecified by legacy visualization config",
+            source_provenance=str(source),
+        )
+    elif not isinstance(metadata, PointValueMetadata):
+        raise TypeError("metadata must be a PointValueMetadata instance")
+    elif CRS.from_user_input(metadata.crs) != CRS.from_epsg(4326):
+        raise ValueError("txt2grd requires metadata.crs to be EPSG:4326")
 
     bounds = [np.inf, -np.inf, np.inf, -np.inf]
     row_count = 0
     with temporary_path(output.parent, ".xyz") as temporary_xyz:
-        for chunk in pd.read_csv(source, sep=r"\s+", chunksize=chunk_rows):
-            if len(chunk.columns) < 3 or "lon" not in chunk or "lat" not in chunk:
-                raise ValueError(
-                    f"text input must contain lon/lat headers and at least three columns: {source}"
+        with HeaderedPointTableSource(
+            source,
+            metadata,
+            chunk_points=chunk_rows,
+            value_column=value_column,
+        ) as point_source:
+            for block in point_source.iter_blocks():
+                selected = pd.DataFrame(
+                    {
+                        "lon": block.x,
+                        "lat": block.y,
+                        "value": block.value * scale,
+                    }
                 )
-            value_column = chunk.columns[2]
-            selected = chunk.loc[:, ["lon", "lat", value_column]].copy()
-            selected["lon"] = pd.to_numeric(selected["lon"], errors="raise")
-            selected["lat"] = pd.to_numeric(selected["lat"], errors="raise")
-            selected[value_column] = pd.to_numeric(selected[value_column], errors="raise") * scale
-            selected = selected[np.isfinite(selected["lon"]) & np.isfinite(selected["lat"])]
-            if selected.empty:
-                continue
+                selected = selected[
+                    np.isfinite(selected["lon"]) & np.isfinite(selected["lat"])
+                ]
+                if selected.empty:
+                    continue
 
-            bounds[0] = min(bounds[0], float(selected["lon"].min()))
-            bounds[1] = max(bounds[1], float(selected["lon"].max()))
-            bounds[2] = min(bounds[2], float(selected["lat"].min()))
-            bounds[3] = max(bounds[3], float(selected["lat"].max()))
-            selected.to_csv(
-                temporary_xyz,
-                sep="\t",
-                columns=["lon", "lat", value_column],
-                header=False,
-                index=False,
-                mode="a",
-            )
-            row_count += len(selected)
+                bounds[0] = min(bounds[0], float(selected["lon"].min()))
+                bounds[1] = max(bounds[1], float(selected["lon"].max()))
+                bounds[2] = min(bounds[2], float(selected["lat"].min()))
+                bounds[3] = max(bounds[3], float(selected["lat"].max()))
+                selected.to_csv(
+                    temporary_xyz,
+                    sep="\t",
+                    columns=["lon", "lat", "value"],
+                    header=False,
+                    index=False,
+                    mode="a",
+                )
+                row_count += len(selected)
 
         if row_count == 0:
             raise ValueError(f"text input contains no valid coordinate rows: {source}")
@@ -367,13 +396,23 @@ def prepare_grid(
     deformation_column: int = 3,
     target_crs: str | None = "EPSG:4326",
     defsour_metadata: DefsourMetadata | None = None,
+    text_value_column: str | None = None,
+    text_metadata: PointValueMetadata | None = None,
 ) -> List[float]:
     """Convert a supported raster or point table into a geographic GMT grid."""
     normalized_type = input_type.strip().lower()
     if normalized_type == "tif":
         return tif2grd(input_path, grd_path, scale, nan_to_zero, target_crs)
     if normalized_type == "txt":
-        return txt2grd(input_path, grd_path, scale, space, chunk_rows)
+        return txt2grd(
+            input_path,
+            grd_path,
+            scale,
+            space,
+            chunk_rows,
+            text_value_column,
+            text_metadata,
+        )
     if normalized_type == "defsour":
         return defsour2grd(
             input_path,
@@ -406,6 +445,8 @@ def prepare_dataset_grid(dataset: Dict[str, object]) -> List[float]:
         deformation_column=int(dataset.get("deformation_column", 3)),
         target_crs=str(dataset.get("target_crs", "EPSG:4326") or "") or None,
         defsour_metadata=dataset.get("defsour_metadata"),
+        text_value_column=str(dataset.get("text_value_column") or "") or None,
+        text_metadata=dataset.get("text_metadata"),
     )
 
 
