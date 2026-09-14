@@ -92,7 +92,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - `geodesy_visualization/styles.py`: shared cfg font/colorbar metadata parsers and CPT-reference resolver; the scope contract is documented in `docs/development/style_cfg_contract.md`.<br>统一的 cfg 字体/色标元数据解析器和 CPT 引用解析器；作用域契约见 `docs/development/style_cfg_contract.md`。
 - `geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.11, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.11 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
-- `lib/pygmt_geo.py`: compatibility re-export for grid preparation and geo views; only the separately classified `add_tifs` implementation remains local.<br>临时网格准备和地理视图的兼容重导出；仅单独分类的 `add_tifs` 实现仍保留在本模块。
+- `lib/pygmt_geo.py`: compatibility re-export for grid preparation and geo views; the unused scientific `add_tifs` remains temporarily as a deprecated compatibility API.<br>临时网格准备和地理视图的兼容重导出；无生产调用的科学运算 `add_tifs` 暂作为已弃用兼容 API 保留。
 - `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
 - `geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
 - `geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。

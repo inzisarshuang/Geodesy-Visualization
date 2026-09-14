@@ -35,7 +35,7 @@ tests and documentation.
 
 | Function | Current production caller | Classification | Next action and gate |
 |---|---|---|---|
-| `add_tifs` | none | `analysis-candidate` | Keep in place. Move to Geodesy-Analysis only if a real workflow adopts it; otherwise deprecate after a separate usage review. |
+| `add_tifs` | none (repository-wide review 2026-09-14) | `analysis-candidate`, deprecated compatibility API | Keep the tested implementation temporarily in place with a `DeprecationWarning`. Do not create an unused Analysis package; remove only in a separately announced major compatibility phase. |
 | `region_from_grd` | `geodesy_visualization.workflows.insar.deformation_map`, `geodesy_visualization.workflows.insar.deformation_profile` | `visualization-view` | Canonical implementation is in `geodesy_visualization.geo`; the legacy module re-exports the same function object. |
 | `tif2grd` | internal only | `visualization-view` | Canonical implementation moved to `geodesy_visualization.grid_preparation`; Adapter 0.11 owns GeoTIFF adaptation, while Visualization owns only temporary GMT conversion. Legacy module re-exports the same function object. |
 | `txt2grd` | internal only | `visualization-view` | Canonical implementation moved to `geodesy_visualization.grid_preparation`; Adapter 0.10 owns named point ingestion, while Visualization owns display scaling and temporary GMT gridding. |
@@ -50,15 +50,15 @@ part of the public compatibility surface.
 
 私有函数 `_validate_matching_grids` 随 `add_tifs` 归属，不属于公共兼容接口。
 
-## Remaining Decision / 剩余决策
+## Completed Usage Decision / 已完成的调用决策
 
 All source adaptation and renderer-specific grid preparation functions have
-passed their Adapter gates and moved behind formal package APIs. The only local
-implementation left in this compatibility module is `add_tifs`. Decide it from
-a real Geodesy-Analysis use case; otherwise deprecate it after a separate caller
-review. Do not move it into Visualization or Adapter for convenience.
+passed their Adapter gates and moved behind formal package APIs. A repository-
+wide review found no production caller for the only remaining local
+implementation, `add_tifs`, so it is now a deprecated compatibility API. It is
+not copied into Visualization, Adapter, or a speculative Analysis package.
 
 所有来源适配和渲染专用网格准备函数均已通过 Adapter 门槛并迁至正式 package
-API。本兼容模块中唯一保留的本地实现为 `add_tifs`。后续应根据真实
-Geodesy-Analysis 用例决定其归属；若无调用者，则在单独审查后弃用，不能为迁移
-方便而放入 Visualization 或 Adapter。
+API。全仓盘点确认唯一剩余本地实现 `add_tifs` 没有生产调用方，因此现作为已弃用
+兼容 API 暂时保留；不复制到 Visualization、Adapter 或没有真实调用方的 Analysis
+空包中。

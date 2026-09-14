@@ -57,7 +57,8 @@ class AddTifsTests(unittest.TestCase):
         second = self.write_raster("second.tif", np.array([[2, 3], [4, -9999]]))
 
         any_output = self.root / "any.tif"
-        add_tifs(str(first), str(second), str(any_output), mask_any=True)
+        with self.assertWarnsRegex(DeprecationWarning, "no production Visualization caller"):
+            add_tifs(str(first), str(second), str(any_output), mask_any=True)
         with rasterio.open(any_output) as src:
             any_result = src.read(1)
         np.testing.assert_allclose(any_result[0, 0], 3.0)
@@ -176,7 +177,10 @@ class GridConversionTests(unittest.TestCase):
             self.assertTrue(np.allclose(generated.iloc[:, 1], [0.0, 1.0], atol=1.0e-4))
             Path(outgrid).write_bytes(b"grid")
 
-        with patch("pygmt_geo.pygmt.xyz2grd", side_effect=fake_xyz2grd):
+        with patch(
+            "geodesy_visualization.grid_preparation.pygmt.xyz2grd",
+            side_effect=fake_xyz2grd,
+        ):
             region = defsour2grd(
                 str(source), str(output), "EPSG:32631", space=0.5, chunk_rows=1
             )
@@ -214,7 +218,10 @@ class GridConversionTests(unittest.TestCase):
             np.testing.assert_allclose(generated.iloc[:, 2], [0.04, -0.02])
             Path(outgrid).write_bytes(b"grid")
 
-        with patch("pygmt_geo.pygmt.xyz2grd", side_effect=fake_xyz2grd):
+        with patch(
+            "geodesy_visualization.grid_preparation.pygmt.xyz2grd",
+            side_effect=fake_xyz2grd,
+        ):
             region = txt2grd(
                 str(source),
                 str(output),

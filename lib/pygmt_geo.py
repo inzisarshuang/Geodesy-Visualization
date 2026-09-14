@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import warnings
 
 import numpy as np
 import rasterio
@@ -81,6 +82,13 @@ def add_tifs(
         为 True 时任一输入为空即输出空值；为 False 时单侧空值按零处理，
         仅两侧均为空时输出空值。
     """
+    warnings.warn(
+        "lib.pygmt_geo.add_tifs is deprecated: it performs scientific raster "
+        "arithmetic and has no production Visualization caller; keep this "
+        "compatibility API only for legacy projects",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     source1 = Path(tif1_path).expanduser().resolve()
     source2 = Path(tif2_path).expanduser().resolve()
     output = Path(out_tif).expanduser().resolve()
