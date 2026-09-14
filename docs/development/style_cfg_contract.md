@@ -84,3 +84,17 @@ values, and then use targeted rendering only when drawing behavior changes.
 只有语义等价的参数才能加入共享解析器。工作流默认值继续保留在调用位置，确保
 采用公共解析器不会改变既有图件。每次迁移必须加载真实 cfg、比较归一化结果；
 只有绘制行为发生变化时才执行针对性的图件验收。
+
+## 6. Axis and Layout Decision / 坐标与布局结论
+
+The spatial time-series map keeps `coordinate_mode=none|outer|all` plus
+longitude/latitude intervals and a geographic format. The auxiliary time-series
+figure keeps its primary/secondary Cartesian GMT frame strings. They share the
+concept of visibility but not a parser or raw cfg alias. Subplot rows, columns,
+panel margins, canvas margin, and responsive font sizing remain exclusive to
+the spatial multi-panel workflow.
+
+时空地图继续使用 `coordinate_mode=none|outer|all`、经纬度间隔和地理格式；辅助
+时序图继续使用主/次笛卡尔 GMT frame 字符串。二者只共享“是否显示”的概念，
+不共享解析器或底层 cfg 别名。子图行列、面板间距、画布留白和响应式字号继续仅
+属于时空多面板工作流。
