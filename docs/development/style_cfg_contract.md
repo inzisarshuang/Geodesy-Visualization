@@ -47,6 +47,11 @@ specifications dynamically.
 - CPT path/name and reverse flag have shared semantics. Dataset prefixes such as
   `defo_` and `dem_` remain necessary because one figure can use both.<br>
   CPT 路径/名称和反转开关语义相同；同图可同时使用形变与 DEM，因此保留数据集前缀。
+  File references ending in `.cpt` or containing a directory component resolve
+  relative to the cfg file; plain values such as `vik` remain GMT built-in
+  palette names. This distinction is owned by `resolve_cpt_reference`.<br>
+  以 `.cpt` 结尾或含目录分量的文件引用相对 cfg 文件解析；`vik` 等纯名称仍表示
+  GMT 内置色标。该判定统一由 `resolve_cpt_reference` 负责。
 - Coordinate visibility, annotation intervals, and grid visibility are shared
   concepts, but Cartesian time axes and geographic map axes use different GMT
   frame syntax and must not share raw frame strings.<br>

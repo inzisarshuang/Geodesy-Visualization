@@ -10,7 +10,11 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from geodesy_visualization.styles import font_style_keys, parse_font_style
+from geodesy_visualization.styles import (
+    font_style_keys,
+    parse_font_style,
+    resolve_cpt_reference,
+)
 from geodesy_visualization.io import parse_style_block
 
 
@@ -53,6 +57,17 @@ class FontStyleContractTests(unittest.TestCase):
                 "10p,Helvetica",
                 "12p,Helvetica",
             )
+
+    def test_resolves_cpt_files_but_preserves_gmt_palette_names(self) -> None:
+        """Keep built-in GMT names portable and anchor file references to cfg."""
+        base = Path("/tmp/example_cfg").resolve()
+        self.assertEqual(resolve_cpt_reference("vik", base), "vik")
+        self.assertEqual(
+            resolve_cpt_reference("../cpt/custom.cpt", base),
+            str((base / "../cpt/custom.cpt").resolve()),
+        )
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            resolve_cpt_reference(" ", base)
 
 
 if __name__ == "__main__":

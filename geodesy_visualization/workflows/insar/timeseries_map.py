@@ -50,7 +50,11 @@ from geodesy_visualization.io import (
     validate_config_keys,
     validate_numeric_range,
 )
-from geodesy_visualization.styles import parse_font_style
+from geodesy_visualization.styles import (
+    font_style_keys,
+    parse_font_style,
+    resolve_cpt_reference,
+)
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 from geodesy_visualization.data import (
     CanonicalGridSelection,
@@ -83,9 +87,9 @@ ALLOWED_KEYS = {
     "chunk_rows", "nan_tokens", "add_colorbar", "colorbar_label", "colorbar_unit",
     "colorbar_interval",
     "colorbar_width", "colorbar_height", "colorbar_offset", "colorbar_box",
-    "output_dpi", "default_font_title", "default_font_annot_primary",
-    "default_font_annot_secondary", "default_font_label",
+    "output_dpi",
 }
+ALLOWED_KEYS.update(font_style_keys("default", include_secondary=True))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -110,15 +114,7 @@ def load_config(config_file: str) -> dict[str, object]:
     ]
     validate_numeric_range(region[0], region[1], "region_west", "region_east")
     validate_numeric_range(region[2], region[3], "region_south", "region_north")
-    cpt_value = get_optional(raw, "cpt", "jet")
-    # Treat values containing a path component as files relative to the cfg.
-    # Plain GMT palette names such as ``jet`` and ``vik`` remain unchanged.
-    cpt_path = Path(cpt_value)
-    cpt = (
-        resolve_path(cpt_value, base)
-        if cpt_path.suffix.lower() == ".cpt" or cpt_path.parent != Path(".")
-        else cpt_value
-    )
+    cpt = resolve_cpt_reference(get_optional(raw, "cpt", "jet"), base)
     data_source = parse_choice(
         get_optional(raw, "data_source", "table"),
         ("table", "canonical"),

@@ -39,6 +39,8 @@ import re
 from pathlib import Path
 import numpy as np
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
 from geodesy_visualization.geo import region_from_grd
 from geodesy_visualization.grid_preparation import prepare_dataset_grid
 from geodesy_visualization.io import (
@@ -56,12 +58,16 @@ from geodesy_visualization.io import (
     validate_config_keys,
     validate_numeric_range,
 )
-from geodesy_visualization.styles import parse_font_style
+from geodesy_visualization.styles import (
+    font_style_keys,
+    parse_font_style,
+    resolve_cpt_reference,
+)
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
 DEFAULT_CONFIG = (
-    Path(__file__).resolve().parents[3]
+    REPOSITORY_ROOT
     / "plot_defo_dem_optic"
     / "plot_defo_dem_optic.cfg"
 )
@@ -75,10 +81,10 @@ ALLOWED_KEYS = {
     "add_colorbar", "add_scale", "map_scale", "map_scale_box", "map_scale_height",
     "map_scale_font_annot", "map_scale_font_label", "add_rose", "target_regions",
     "target_region_pen", "target_region_label_font", "target_region_label_offset",
-    "target_region_center_style", "default_font_title", "default_font_annot_primary",
-    "default_font_label", "map_font_title", "map_font_annot_primary", "map_font_label",
-    "output_defo", "defo_basemap_mode",
+    "target_region_center_style", "output_defo", "defo_basemap_mode",
 }
+for _style_prefix in ("default", "map"):
+    ALLOWED_KEYS.update(font_style_keys(_style_prefix))
 for _prefix in ("sbas", "psi"):
     ALLOWED_KEYS.update(
         {
@@ -186,7 +192,7 @@ def load_config(config_path: str) -> dict:
     cfg = load_key_value_config(str(cfg_path))
     validate_raw_config(cfg, cfg_path)
     base_dir = cfg_path.parent
-    cpt_dir = Path(__file__).resolve().parents[1] / "cpt"
+    cpt_dir = REPOSITORY_ROOT / "cpt"
 
     output_dir = resolve_path(get_optional(cfg, "output_dir", "result"), base_dir)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -272,7 +278,9 @@ def load_config(config_path: str) -> dict:
         "region": parse_manual_region(cfg),
         "dem_tif": resolve_path(dem_file, base_dir) if dem_file else "",
         "optic_tif": resolve_path(optic_file, base_dir) if optic_file else "",
-        "defo_cpt": resolve_path(get_optional(cfg, "defo_cpt", str(cpt_dir / "saga-01.cpt")), base_dir),
+        "defo_cpt": resolve_cpt_reference(
+            get_optional(cfg, "defo_cpt", str(cpt_dir / "saga-01.cpt")), base_dir
+        ),
         "defo_cpt_reverse": parse_bool(get_optional(cfg, "defo_cpt_reverse", ""), False),
         "dem_cpt": get_optional(cfg, "dem_cpt", "gray"),
         "defo_bar_min": parse_float(get_optional(cfg, "defo_bar_min", ""), -0.06),

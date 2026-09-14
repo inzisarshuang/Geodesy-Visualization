@@ -31,7 +31,7 @@ from geodesy_visualization.io import (
     validate_config_keys,
     validate_numeric_range,
 )
-from geodesy_visualization.styles import parse_font_style
+from geodesy_visualization.styles import font_style_keys, parse_font_style
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
@@ -49,10 +49,10 @@ ALLOWED_KEYS = {
     "precip_color", "temperature_color", "defo_label", "precip_label", "temperature_label",
     "time_label", "defo_symbol", "defo_pen", "fit_pen", "precip_pen", "temperature_pen",
     "x_primary_frame", "x_secondary_frame", "defo_y_frame", "precip_y_frame",
-    "temperature_y_frame", "default_font_title", "default_font_annot_primary",
-    "default_font_label", "primary_time_font", "secondary_tick_length",
+    "temperature_y_frame", "primary_time_font", "secondary_tick_length",
     "secondary_annot_offset",
 }
+ALLOWED_KEYS.update(font_style_keys("default"))
 
 
 # ---------------------------------------------------------------------------

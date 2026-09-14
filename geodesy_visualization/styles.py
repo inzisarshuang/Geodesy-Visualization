@@ -11,10 +11,13 @@ geodesy_visualization.styles
         返回一个具名前缀支持的标准字体 cfg 键集合。
     ``parse_font_style``:
         将具名前缀的字体 cfg 解析为 GMT 配置字典。
+    ``resolve_cpt_reference``:
+        区分 GMT 内置色标名称与相对 cfg 的 CPT 文件引用。
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Mapping
 
 
@@ -64,4 +67,17 @@ def parse_font_style(
     return values
 
 
-__all__ = ["font_style_keys", "parse_font_style"]
+def resolve_cpt_reference(value: str, base_dir: str | Path) -> str:
+    """Resolve a CPT file relative to its cfg while preserving GMT palette names."""
+    normalized = str(value).strip()
+    if not normalized:
+        raise ValueError("CPT reference must not be empty")
+    path = Path(normalized).expanduser()
+    if path.suffix.lower() != ".cpt" and path.parent == Path("."):
+        return normalized
+    if not path.is_absolute():
+        path = Path(base_dir) / path
+    return str(path.resolve())
+
+
+__all__ = ["font_style_keys", "parse_font_style", "resolve_cpt_reference"]

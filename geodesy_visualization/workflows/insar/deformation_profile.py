@@ -55,7 +55,11 @@ from geodesy_visualization.io import (
     validate_numeric_range,
     validate_same_length,
 )
-from geodesy_visualization.styles import parse_font_style
+from geodesy_visualization.styles import (
+    font_style_keys,
+    parse_font_style,
+    resolve_cpt_reference,
+)
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
@@ -74,11 +78,10 @@ ALLOWED_KEYS = {
     "track_end_suffix", "marker_lon", "marker_lat", "marker_style", "marker_pen", "marker_fill",
     "export_line_profiles", "export_scatter_profiles", "profile_title_prefix",
     "profile_x_label", "profile_y_label", "profile_padding", "profile_projection",
-    "profile_legend_position", "profile_legend_box", "default_font_title",
-    "default_font_annot_primary", "default_font_label", "map_font_title",
-    "map_font_annot_primary", "map_font_label", "profile_font_title",
-    "profile_font_annot_primary", "profile_font_label",
+    "profile_legend_position", "profile_legend_box",
 }
+for _style_prefix in ("default", "map", "profile"):
+    ALLOWED_KEYS.update(font_style_keys(_style_prefix))
 for _prefix in ("dataset1", "dataset2"):
     ALLOWED_KEYS.update(
         {
@@ -180,7 +183,9 @@ def load_config(config_path: str) -> dict:
         "projection": get_optional(cfg, "projection", "M8i"),
         "dem_tif": resolve_path(get_required(cfg, "dem_tif"), base_dir),
         "dem_cpt": get_optional(cfg, "dem_cpt", "gray"),
-        "defo_cpt": resolve_path(get_optional(cfg, "defo_cpt", str(cpt_path / "seismic.cpt")), base_dir),
+        "defo_cpt": resolve_cpt_reference(
+            get_optional(cfg, "defo_cpt", str(cpt_path / "seismic.cpt")), base_dir
+        ),
         "defo_cpt_reverse": parse_bool(get_optional(cfg, "defo_cpt_reverse", ""), False),
         "dem_bar_min": parse_float(get_optional(cfg, "dem_bar_min", ""), 700.0),
         "dem_bar_max": parse_float(get_optional(cfg, "dem_bar_max", ""), 2300.0),
