@@ -10,6 +10,7 @@ This file defines the rules an AI coding agent or human contributor should read 
 - Put canonical cfg-driven workflow orchestration under `geodesy_visualization.workflows`; keep old `plot_*` scripts as compatibility CLIs during migration.
 - Read canonical HDF5 only through the installed `insar_data_adapter` public API; never import a sibling repository path or access its private HDF5 handle.
 - Before changing or moving `lib/pygmt_geo.py`, read and update `docs/development/pygmt_geo_ownership.md`; do not move that mixed module wholesale.
+- Before adding or renaming font, axis, CPT, colorbar, spacing, or panel-layout cfg keys, read `docs/development/style_cfg_contract.md` and preserve its scope/precedence rules.
 - Add domain, mask, or export modules only when the repository has independent behavior to own; do not create empty pipeline stages.
 - Add a shared function only when it removes real duplication or establishes one scientific behavior in one place.
 - Preserve existing cfg keys unless a migration path and compatibility alias are provided.

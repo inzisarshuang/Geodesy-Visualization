@@ -31,6 +31,7 @@ from geodesy_visualization.io import (
     validate_config_keys,
     validate_numeric_range,
 )
+from geodesy_visualization.styles import parse_font_style
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
@@ -118,9 +119,13 @@ def load_config(config_file: str) -> dict[str, object]:
         "secondary_tick_length": get_optional(raw, "secondary_tick_length", "0p"),
         "secondary_annot_offset": get_optional(raw, "secondary_annot_offset", "18p"),
         "defaults": {
-            "FONT_TITLE": get_optional(raw, "default_font_title", "14p,Helvetica-Bold"),
-            "FONT_ANNOT_PRIMARY": get_optional(raw, "default_font_annot_primary", "11p,Helvetica"),
-            "FONT_LABEL": get_optional(raw, "default_font_label", "11p,Helvetica"),
+            **parse_font_style(
+                raw,
+                "default",
+                "14p,Helvetica-Bold",
+                "11p,Helvetica",
+                "11p,Helvetica",
+            ),
             "MAP_FRAME_TYPE": "plain",
             "MAP_FRAME_PEN": "0.8p,black",
         },

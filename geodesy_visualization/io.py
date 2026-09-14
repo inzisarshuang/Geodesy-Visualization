@@ -52,6 +52,8 @@ from difflib import get_close_matches
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
+from geodesy_visualization.styles import parse_font_style as parse_style_block
+
 
 def gdal_translate(
     src: str,
@@ -307,21 +309,6 @@ def validate_closed_range(value: float, key: str, minimum: float, maximum: float
     """Ensure a numeric value falls inside a closed interval."""
     if not minimum <= value <= maximum:
         raise ValueError(f"{key} must be between {minimum} and {maximum}; got {value}")
-
-
-def parse_style_block(
-    cfg: Dict[str, str],
-    prefix: str,
-    default_title: str,
-    default_annot: str,
-    default_label: str,
-) -> Dict[str, str]:
-    """Collect font-related style values for a named block."""
-    return {
-        "FONT_TITLE": get_optional(cfg, f"{prefix}_font_title", default_title),
-        "FONT_ANNOT_PRIMARY": get_optional(cfg, f"{prefix}_font_annot_primary", default_annot),
-        "FONT_LABEL": get_optional(cfg, f"{prefix}_font_label", default_label),
-    }
 
 
 def validate_same_length(items: Sequence[Sequence[object]], names: Sequence[str]) -> None:

@@ -48,7 +48,6 @@ from geodesy_visualization.io import (
     parse_csv_strings,
     parse_float,
     parse_int,
-    parse_style_block,
     resolve_output_path,
     resolve_path,
     validate_closed_range,
@@ -56,6 +55,7 @@ from geodesy_visualization.io import (
     validate_numeric_range,
     validate_same_length,
 )
+from geodesy_visualization.styles import parse_font_style
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
@@ -204,21 +204,21 @@ def load_config(config_path: str) -> dict:
         "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "20p"),
         "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,Helvetica-Bold,black"),
         "add_rose": parse_bool(get_optional(cfg, "add_rose", ""), True),
-        "default_style": parse_style_block(
+        "default_style": parse_font_style(
             cfg,
             "default",
             "24p,Helvetica-Bold",
             "12p,Helvetica-Bold",
             "20p,Helvetica-Bold",
         ),
-        "map_style": parse_style_block(
+        "map_style": parse_font_style(
             cfg,
             "map",
             "28p,Helvetica-Bold",
             "14p,Helvetica-Bold",
             "28p,Helvetica-Bold",
         ),
-        "profile_style": parse_style_block(
+        "profile_style": parse_font_style(
             cfg,
             "profile",
             "20p,Helvetica-Bold",

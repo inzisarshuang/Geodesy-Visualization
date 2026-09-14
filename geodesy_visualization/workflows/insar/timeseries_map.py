@@ -50,6 +50,7 @@ from geodesy_visualization.io import (
     validate_config_keys,
     validate_numeric_range,
 )
+from geodesy_visualization.styles import parse_font_style
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 from geodesy_visualization.data import (
     CanonicalGridSelection,
@@ -225,14 +226,14 @@ def load_config(config_file: str) -> dict[str, object]:
         "colorbar_offset": get_optional(raw, "colorbar_offset", "0c/0.9c"),
         "colorbar_box": get_optional(raw, "colorbar_box", "F+gwhite+p1p+c10p/8p"),
         "output_dpi": parse_int(get_optional(raw, "output_dpi", ""), 600),
-        "defaults": {
-            "FONT_TITLE": get_optional(raw, "default_font_title", "16p,Helvetica-Bold"),
-            "FONT_ANNOT_PRIMARY": get_optional(raw, "default_font_annot_primary", "10p,Helvetica"),
-            "FONT_ANNOT_SECONDARY": get_optional(
-                raw, "default_font_annot_secondary", "10p,Helvetica"
-            ),
-            "FONT_LABEL": get_optional(raw, "default_font_label", "12p,Helvetica"),
-        },
+        "defaults": parse_font_style(
+            raw,
+            "default",
+            "16p,Helvetica-Bold",
+            "10p,Helvetica",
+            "12p,Helvetica",
+            default_secondary="10p,Helvetica",
+        ),
     }
     if cfg["rows"] < 1 or cfg["columns"] < 1 or cfg["chunk_rows"] < 1:
         raise ValueError("subplot dimensions and chunk_rows must be positive")

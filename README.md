@@ -89,6 +89,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - `geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
 - `geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
 - `geodesy_visualization/grid_preparation.py`: canonical Adapter-backed GeoTIFF, named TXT, and Defsour preparation for temporary GMT grids, plus source-neutral dataset dispatch.<br>正式负责由 Adapter 驱动的 GeoTIFF、具名 TXT 与 Defsour 临时 GMT 网格准备，以及来源中立的数据集调度。
+- `geodesy_visualization/styles.py`: shared cfg font-style vocabulary and parser; the scope contract is documented in `docs/development/style_cfg_contract.md`.<br>统一的 cfg 字体样式词汇与解析器；作用域契约见 `docs/development/style_cfg_contract.md`。
 - `geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.11, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.11 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: compatibility re-export for grid preparation and geo views; only the separately classified `add_tifs` implementation remains local.<br>临时网格准备和地理视图的兼容重导出；仅单独分类的 `add_tifs` 实现仍保留在本模块。

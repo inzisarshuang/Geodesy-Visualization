@@ -11,4 +11,4 @@ geodesy_visualization
     当前包级接口由 ``geodesy_visualization.io`` 模块提供，不在包根重复定义函数。
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
