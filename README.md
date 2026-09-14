@@ -88,7 +88,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 
 - `geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
 - `geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
-- `geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.8, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.8 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
+- `geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.9, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.9 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: transitional raster conversion and view-preparation module; its function-level migration boundary is recorded in `docs/development/pygmt_geo_ownership.md`.<br>过渡期的栅格转换与视图准备模块；函数级迁移边界记录在 `docs/development/pygmt_geo_ownership.md`。
 - `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
@@ -106,7 +106,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - Python 3.10 or newer; the recommended Conda environment name is `envPlot`.<br>Python 3.10 或更高版本，推荐 Conda 环境名为 `envPlot`。
 - GMT and PyGMT for map and grid operations.<br>GMT 与 PyGMT，用于地图和网格操作。
 - GDAL with `gdal_translate` available on `PATH`.<br>GDAL，并确保 `gdal_translate` 位于 `PATH`。
-- Rasterio, PyProj, NumPy, Pandas, and `insar-data-adapter>=0.8.0` for geospatial, tabular, and canonical-HDF5 access.<br>Rasterio、PyProj、NumPy、Pandas 及 `insar-data-adapter>=0.8.0`，用于地理空间、表格和标准 HDF5 访问。
+- Rasterio, PyProj, NumPy, Pandas, and `insar-data-adapter>=0.9.0` for geospatial, tabular, Defsour, and canonical-HDF5 access.<br>Rasterio、PyProj、NumPy、Pandas 及 `insar-data-adapter>=0.9.0`，用于地理空间、表格、Defsour 和标准 HDF5 访问。
 
 ### 3.2 Installation / 安装方法
 

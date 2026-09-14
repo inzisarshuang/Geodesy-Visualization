@@ -37,7 +37,8 @@ import numpy as np
 import pandas as pd
 import pygmt
 import rasterio
-from pyproj import CRS, Transformer
+from insar_data_adapter import DefsourMetadata, DefsourPointSource
+from pyproj import CRS
 from rasterio.enums import Resampling
 from rasterio.transform import array_bounds
 from rasterio.warp import calculate_default_transform, reproject
@@ -274,8 +275,14 @@ def defsour2grd(
     space: float = 0.0005,
     chunk_rows: int = 250_000,
     deformation_column: int = 3,
+    metadata: DefsourMetadata | None = None,
 ) -> List[float]:
-    """Convert a headerless Defsour X/Y/elevation/deformation table to a WGS84 grid."""
+    """Prepare a WGS84 GMT grid from Adapter-validated Defsour point blocks.
+
+    ``metadata`` is optional only for compatibility with existing visualization
+    cfg files. The compatibility record explicitly marks unavailable scientific
+    semantics as unspecified; it does not infer units, LOS sign, or references.
+    """
     source = Path(txt_path).expanduser().resolve()
     output = Path(grd_path).expanduser().resolve()
     if not source.is_file():
@@ -287,33 +294,50 @@ def defsour2grd(
     if space <= 0 or chunk_rows <= 0:
         raise ValueError("space and chunk_rows must be positive")
     output.parent.mkdir(parents=True, exist_ok=True)
-    transformer = Transformer.from_crs(input_crs, "EPSG:4326", always_xy=True)
+    if metadata is None:
+        metadata = DefsourMetadata(
+            input_crs=input_crs,
+            deformation_unit="unspecified by legacy visualization config",
+            deformation_quantity="unspecified snapshot deformation",
+            height_unit="unspecified by legacy visualization config",
+            los_positive="unspecified by legacy visualization config",
+            nodata_policy="non-finite deformation is excluded; zero is valid",
+            temporal_reference="unspecified by legacy visualization config",
+            spatial_reference="unspecified by legacy visualization config",
+            source_provenance=str(source),
+        )
+    elif not isinstance(metadata, DefsourMetadata):
+        raise TypeError("metadata must be a DefsourMetadata instance")
+    elif CRS.from_user_input(metadata.input_crs) != CRS.from_user_input(input_crs):
+        raise ValueError("metadata.input_crs must match input_crs")
     bounds = [np.inf, -np.inf, np.inf, -np.inf]
     row_count = 0
-    usecols = sorted({0, 1, deformation_column})
     with temporary_path(output.parent, ".xyz") as temporary_xyz:
-        for chunk in pd.read_csv(
+        with DefsourPointSource(
             source,
-            sep=r"\s+",
-            header=None,
-            usecols=usecols,
-            chunksize=chunk_rows,
-        ):
-            x = pd.to_numeric(chunk[0], errors="raise").to_numpy(dtype=float)
-            y = pd.to_numeric(chunk[1], errors="raise").to_numpy(dtype=float)
-            value = pd.to_numeric(chunk[deformation_column], errors="raise").to_numpy(dtype=float)
-            # Lists avoid a pyproj/NumPy scalar-conversion warning for one-row chunks.
-            lon, lat = transformer.transform(x.tolist(), y.tolist())
-            selected = pd.DataFrame({"lon": lon, "lat": lat, "value": value * scale})
-            selected = selected[np.isfinite(selected).all(axis=1)]
-            if selected.empty:
-                continue
-            bounds[0] = min(bounds[0], float(selected["lon"].min()))
-            bounds[1] = max(bounds[1], float(selected["lon"].max()))
-            bounds[2] = min(bounds[2], float(selected["lat"].min()))
-            bounds[3] = max(bounds[3], float(selected["lat"].max()))
-            selected.to_csv(temporary_xyz, sep="\t", header=False, index=False, mode="a")
-            row_count += len(selected)
+            metadata,
+            chunk_points=chunk_rows,
+            deformation_column=deformation_column,
+        ) as point_source:
+            for block in point_source.iter_blocks(target_crs="EPSG:4326"):
+                selected = pd.DataFrame(
+                    {
+                        "lon": block.x,
+                        "lat": block.y,
+                        "value": block.deformation * scale,
+                    }
+                )
+                selected = selected[np.isfinite(selected).all(axis=1)]
+                if selected.empty:
+                    continue
+                bounds[0] = min(bounds[0], float(selected["lon"].min()))
+                bounds[1] = max(bounds[1], float(selected["lon"].max()))
+                bounds[2] = min(bounds[2], float(selected["lat"].min()))
+                bounds[3] = max(bounds[3], float(selected["lat"].max()))
+                selected.to_csv(
+                    temporary_xyz, sep="\t", header=False, index=False, mode="a"
+                )
+                row_count += len(selected)
         if row_count == 0:
             raise ValueError(f"Defsour input contains no valid coordinate rows: {source}")
         x_steps = max(1, int(np.ceil((bounds[1] - bounds[0]) / space)))
@@ -342,6 +366,7 @@ def prepare_grid(
     input_crs: str | None = None,
     deformation_column: int = 3,
     target_crs: str | None = "EPSG:4326",
+    defsour_metadata: DefsourMetadata | None = None,
 ) -> List[float]:
     """Convert a supported raster or point table into a geographic GMT grid."""
     normalized_type = input_type.strip().lower()
@@ -358,6 +383,7 @@ def prepare_grid(
             space,
             chunk_rows,
             deformation_column,
+            defsour_metadata,
         )
     raise ValueError(f"unsupported input_type: {input_type}; choose from tif, txt, defsour")
 
@@ -379,6 +405,7 @@ def prepare_dataset_grid(dataset: Dict[str, object]) -> List[float]:
         input_crs=str(dataset.get("input_crs") or "") or None,
         deformation_column=int(dataset.get("deformation_column", 3)),
         target_crs=str(dataset.get("target_crs", "EPSG:4326") or "") or None,
+        defsour_metadata=dataset.get("defsour_metadata"),
     )
 
 
