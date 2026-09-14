@@ -18,6 +18,7 @@ or cfg paths.
 PyGMT-Plotter/
 ├── AGENTS.md                         # coding baseline / 代码基线
 ├── CONTRIBUTING.md                   # contribution workflow / 开发流程
+├── pyproject.toml                    # installable package metadata / 可安装包元数据
 ├── cpt/                              # shared color palettes / 公共色带
 ├── docs/development/                 # engineering rules / 工程规则
 ├── geodesy_visualization/            # new public Python package / 新公共 Python 包
@@ -122,10 +123,22 @@ conda create -n envPlot -c conda-forge \
   python=3.10 pygmt=0.10 gmt gdal rasterio pyproj numpy pandas h5py -y
 conda activate envPlot
 
-# Until insar-data-adapter is published, install its checkout as a package.
-# 在 insar-data-adapter 发布前，从本地仓库将其安装为正式包。
+# Until insar-data-adapter is published, install its checkout first.
+# 在 insar-data-adapter 发布前，先从本地仓库安装 Adapter。
 python -m pip install -e ../InSAR-Data-Adapter
-python -m pip install -r requirements.txt
+
+# Install the complete Visualization package and all plotting backends.
+# 安装完整 Visualization 包及全部绘图后端。
+python -m pip install -e '.[all]'
+```
+
+An Analysis environment that only consumes the Matplotlib backend can avoid
+GMT, PyGMT, Rasterio, and Adapter dependencies:
+
+只使用 Matplotlib 后端的 Analysis 环境无需安装 GMT、PyGMT、Rasterio 或 Adapter：
+
+```bash
+python -m pip install -e '../PyGMT-Plotter[matplotlib]'
 ```
 
 PyGMT `0.10.0` is the verified server version. Later compatible versions may be used after running the repository tests and both example workflows.
