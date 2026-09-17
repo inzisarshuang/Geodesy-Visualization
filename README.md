@@ -1,21 +1,21 @@
-# PyGMT-Plotter
+# Geodesy-Visualization
 
-PyGMT-Plotter is a configuration-driven toolkit for deformation maps, DEM or optical basemaps, and deformation profiles. It combines strict cfg interfaces, bounded-memory geospatial processing, and reusable PyGMT drawing primitives.
+Geodesy-Visualization is a configuration-driven toolkit for deformation maps, DEM or optical basemaps, and deformation profiles. It combines strict cfg interfaces, bounded-memory geospatial processing, and reusable PyGMT drawing primitives.
 
-PyGMT-Plotter 是一个配置驱动的科研绘图库，用于绘制形变地图、DEM 或光学底图以及形变剖面。仓库整合了严格的 cfg 接口、低内存地理数据处理和可复用的 PyGMT 绘图功能。
+Geodesy-Visualization 是一个配置驱动的科研绘图库，用于绘制形变地图、DEM 或光学底图以及形变剖面。仓库整合了严格的 cfg 接口、低内存地理数据处理和可复用的 PyGMT 绘图功能。
 
-The repository is being reorganized toward the engine-neutral name
-`Geodesy-Visualization`. The first compatibility phase introduces the
-`geodesy_visualization` Python package without changing repository, workflow,
-or cfg paths.
+The repository now uses the engine-neutral name `Geodesy-Visualization`. The
+legacy `PyGMT-Plotter` absolute path remains as a temporary compatibility
+symlink; Python imports, workflow entry points, and cfg contracts are unchanged.
 
-仓库正在向不绑定绘图引擎的 `Geodesy-Visualization` 重组。首个兼容阶段引入
-`geodesy_visualization` Python 包，但不改变仓库路径、工作流入口或 cfg 路径。
+仓库现已使用不绑定绘图引擎的 `Geodesy-Visualization` 名称。旧的
+`PyGMT-Plotter` 绝对路径暂由兼容软链接保留；Python 导入、工作流入口和 cfg
+契约均未改变。
 
 ## 1. Project Structure / 项目结构
 
 ```text
-PyGMT-Plotter/
+Geodesy-Visualization/
 ├── AGENTS.md                         # coding baseline / 代码基线
 ├── CONTRIBUTING.md                   # contribution workflow / 开发流程
 ├── pyproject.toml                    # installable package metadata / 可安装包元数据
@@ -125,7 +125,7 @@ conda activate envPlot
 
 # Until insar-data-adapter is published, install its checkout first.
 # 在 insar-data-adapter 发布前，先从本地仓库安装 Adapter。
-python -m pip install -e ../InSAR-Data-Adapter
+python -m pip install -e ../Geodesy-Data-Adapter
 
 # Install the complete Visualization package and all plotting backends.
 # 安装完整 Visualization 包及全部绘图后端。
@@ -138,7 +138,7 @@ GMT, PyGMT, Rasterio, and Adapter dependencies:
 只使用 Matplotlib 后端的 Analysis 环境无需安装 GMT、PyGMT、Rasterio 或 Adapter：
 
 ```bash
-python -m pip install -e '../PyGMT-Plotter[matplotlib]'
+python -m pip install -e '../Geodesy-Visualization[matplotlib]'
 ```
 
 PyGMT `0.10.0` is the verified server version. Later compatible versions may be used after running the repository tests and both example workflows.

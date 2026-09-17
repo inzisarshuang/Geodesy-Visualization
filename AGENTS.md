@@ -1,4 +1,4 @@
-# PyGMT-Plotter Coding Baseline
+# Geodesy-Visualization Coding Baseline
 
 This file defines the rules an AI coding agent or human contributor should read before changing this repository.
 
