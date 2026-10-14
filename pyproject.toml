@@ -17,6 +17,9 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
 ]
 
+[project.scripts]
+geodesy-visualization-insar-baseline = "geodesy_visualization.workflows.insar.baseline_cli:main"
+
 [project.optional-dependencies]
 matplotlib = [
   "matplotlib",
@@ -51,3 +54,6 @@ geodesy_visualization = [
   "fonts/*",
   "fonts/*/*",
 ]
+
+[tool.setuptools.data-files]
+"share/geodesy-visualization/config_examples" = ["config_examples/*.cfg"]

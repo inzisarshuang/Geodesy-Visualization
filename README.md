@@ -20,6 +20,7 @@ Geodesy-Visualization/
 ├── CONTRIBUTING.md                   # contribution workflow / 开发流程
 ├── pyproject.toml                    # installable package metadata / 可安装包元数据
 ├── cpt/                              # shared color palettes / 公共色带
+├── config_examples/                  # workflow cfg examples / 流程配置示例
 ├── docs/development/                 # engineering rules / 工程规则
 ├── geodesy_visualization/            # new public Python package / 新公共 Python 包
 │   ├── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
@@ -27,6 +28,7 @@ Geodesy-Visualization/
 │   ├── data/
 │   │   └── canonical_grid.py         # bounded canonical HDF5 consumer / 标准 HDF5 分块消费层
 │   ├── workflows/insar/
+│   │   ├── baseline_network.py        # baseline-network figure / 基线网络图
 │   │   ├── deformation_map.py        # canonical deformation-map workflow / 正式形变地图流程
 │   │   ├── deformation_profile.py    # canonical deformation-profile workflow / 正式形变剖面流程
 │   │   ├── timeseries_aux.py         # canonical auxiliary-series workflow / 正式辅助时序流程
@@ -83,7 +85,19 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 3. Sample both grids along every track and calculate cumulative WGS84 distance.<br>沿每条轨迹采样两套网格并计算 WGS84 累计距离。
 4. Export one map per dataset and optional line or scatter comparison figures per track.<br>为每套数据输出地图，并按剖线选择输出折线或散点对比图。
 
-### 2.3 Library Responsibilities / 函数库职责
+### 2.3 Baseline Network / 基线网络图
+
+`geodesy-visualization-insar-baseline` reads a completed
+`baseline_manifest.json` from Geodesy-Analysis, validates its referenced
+four-column network, and draws acquisition nodes and selected interferogram
+pairs. It does not invoke GAMMA or modify Analysis products.
+
+`geodesy-visualization-insar-baseline` 读取 Geodesy-Analysis 发布的
+`baseline_manifest.json`，校验其引用的四列基线网络，并绘制
+影像节点与已选干涉对。该流程不调用 GAMMA，也不修改 Analysis
+产品。
+
+### 2.4 Library Responsibilities / 函数库职责
 
 `plot_defo_timeseries_map` provides cfg-driven multi-epoch geographic panels. `plot_defo_timeseries_aux` provides a shared-date-axis deformation, fit, precipitation, and temperature figure. Each workflow keeps its example input under its own `data/` directory and writes figures under `result/`.
 
@@ -100,6 +114,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - `geodesy_visualization/backends/matplotlib.py`: analysis-neutral array panels, target-series figures, InSAR/GNSS comparison composition, and bundled-font registration.<br>正式负责与 Analysis 解耦的数组子图、目标时序图、InSAR/GNSS 对比图组合及内置字体注册。
 - `geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
 - `geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。
+- `geodesy_visualization/workflows/insar/baseline_network.py`: validates Analysis baseline products and atomically publishes the Matplotlib network figure.<br>校验 Analysis 基线产品并原子发布 Matplotlib 基线网络图。
 - `geodesy_visualization/workflows/insar/deformation_map.py`: canonical cfg-driven DEM/optical deformation-map orchestration using formal package grid preparation.<br>正式的 cfg 驱动 DEM/光学形变地图编排，直接使用正式 package 临时网格准备接口。
 - `geodesy_visualization/workflows/insar/deformation_profile.py`: canonical cfg-driven map, shared-track sampling, and line/scatter profile orchestration.<br>正式的 cfg 驱动地图、公共轨迹采样及折线/散点剖面编排。
 - `lib/pygmt_visual.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有绘图器导入路径提供兼容重导出，不包含独立实现。
@@ -187,6 +202,22 @@ conda run -n envPlot python plot_defo_timeseries_aux/plot_defo_timeseries_aux.py
   --config plot_defo_timeseries_aux/plot_defo_timeseries_aux.cfg
 ```
 
+### 4.5 InSAR Baseline Network / InSAR 基线网络图
+
+Copy [the documented example cfg](config_examples/baseline_plot.cfg) into the
+research project's `config/visualization/` directory, set its project root,
+manifest and output, then run the installed command from any directory.
+
+将[已完整注释的配置示例](config_examples/baseline_plot.cfg)复制到研究项目的
+`config/visualization/` 目录，设置项目根目录、基线清单与输出路径，
+即可从任意目录执行：
+
+```bash
+/absolute/envPlot/bin/geodesy-visualization-insar-baseline \
+  --config /absolute/PROJECT/config/visualization/baseline_plot.cfg \
+  --case ascending
+```
+
 Each example cfg documents every supported key, unit, valid choice, and output option. Unknown, duplicate, malformed, or inconsistent settings fail before plotting. Hex colors such as `#1f77b4` are accepted directly.
 
 每个示例 cfg 均说明支持的配置键、单位、可选值和输出选项。未知、重复、格式错误或相互矛盾的参数会在绘图前报错；可直接使用 `#1f77b4` 等十六进制颜色。
@@ -222,6 +253,7 @@ Each example cfg documents every supported key, unit, valid choice, and output o
 - Grid scatter plots use temporary XYZ files instead of materializing a full Pandas DataFrame.<br>网格散点通过临时 XYZ 文件交给 GMT，不构造完整 Pandas DataFrame。
 - Temporary products use unique names, and final grids or figures replace destinations only after success.<br>临时产品使用唯一名称，最终网格或图片仅在成功后替换目标文件。
 - Display limits such as `defo_bar_min` and `defo_bar_max` control color mapping without altering source values.<br>`defo_bar_min` 和 `defo_bar_max` 等显示范围只控制颜色映射，不修改源数据。
+- Baseline figures consume only a completed schema-1 manifest and its relative network table; output uses a temporary sibling and replaces the final PNG only after success.<br>基线图仅读取已完成的 schema-1 清单及其相对网络表；输出先写入同目录临时文件，成功后才替换最终 PNG。
 
 ## 6. Verification And Development / 验证与开发
 
