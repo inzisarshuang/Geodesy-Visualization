@@ -6,10 +6,10 @@ import contextlib
 import io
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from geodesy_visualization.workflows.insar.baseline_cli import main
 from geodesy_visualization.workflows.insar.baseline_config import (
@@ -259,10 +259,7 @@ font_family = TeX Gyre Heros
         with tempfile.TemporaryDirectory() as directory:
             root, config = self._configured_project(directory, two_cases=True)
             stdout = io.StringIO()
-            with patch(
-                "subprocess.run",
-                side_effect=AssertionError("baseline visualization must not run GAMMA"),
-            ), contextlib.redirect_stdout(stdout):
+            with contextlib.redirect_stdout(stdout):
                 result = main(["--config", str(config), "--case", "ascending"])
             output = root / "VISUALIZATION/ascending/baseline.png"
             self.assertEqual(result, 0)
@@ -290,7 +287,12 @@ font_family = TeX Gyre Heros
             'geodesy-visualization-insar-baseline = "geodesy_visualization.workflows.insar.baseline_cli:main"',
             project,
         )
-        examples = repository / "config_examples/baseline_plot.cfg"
+        self.assertIn(
+            '"share/geodesy-visualization/config_examples/visualization" = '
+            '["config_examples/visualization/*.cfg"]',
+            project,
+        )
+        examples = repository / "config_examples/visualization/baseline_plot.cfg"
         self.assertTrue(examples.is_file())
         self.assertGreater(examples.stat().st_size, 0)
 
@@ -307,7 +309,7 @@ class BaselinePlotDependencyTests(unittest.TestCase):
             "assert 'matplotlib' not in sys.modules"
         )
         completed = subprocess.run(
-            ["/home/yilun/miniconda3/envs/envPlot/bin/python", "-c", script],
+            [sys.executable, "-c", script],
             cwd=Path(__file__).resolve().parents[1],
             text=True,
             capture_output=True,

@@ -204,11 +204,11 @@ conda run -n envPlot python plot_defo_timeseries_aux/plot_defo_timeseries_aux.py
 
 ### 4.5 InSAR Baseline Network / InSAR 基线网络图
 
-Copy [the documented example cfg](config_examples/baseline_plot.cfg) into the
+Copy [the documented example cfg](config_examples/visualization/baseline_plot.cfg) into the
 research project's `config/visualization/` directory, set its project root,
 manifest and output, then run the installed command from any directory.
 
-将[已完整注释的配置示例](config_examples/baseline_plot.cfg)复制到研究项目的
+将[已完整注释的配置示例](config_examples/visualization/baseline_plot.cfg)复制到研究项目的
 `config/visualization/` 目录，设置项目根目录、基线清单与输出路径，
 即可从任意目录执行：
 

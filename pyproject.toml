@@ -56,4 +56,4 @@ geodesy_visualization = [
 ]
 
 [tool.setuptools.data-files]
-"share/geodesy-visualization/config_examples" = ["config_examples/*.cfg"]
+"share/geodesy-visualization/config_examples/visualization" = ["config_examples/visualization/*.cfg"]
