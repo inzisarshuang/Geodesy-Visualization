@@ -22,7 +22,7 @@ Geodesy-Visualization/
 ├── cpt/                              # shared color palettes / 公共色带
 ├── config_examples/                  # workflow cfg examples / 流程配置示例
 ├── docs/development/                 # engineering rules / 工程规则
-├── geodesy_visualization/            # new public Python package / 新公共 Python 包
+├── src/geodesy_visualization/            # new public Python package / 新公共 Python 包
 │   ├── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
 │   ├── geo.py                        # view geometry and sampling / 视图几何与采样
 │   ├── data/
@@ -36,15 +36,15 @@ Geodesy-Visualization/
 │   ├── backends/
 │   │   ├── matplotlib.py             # canonical Matplotlib backend / 正式 Matplotlib 后端
 │   │   └── pygmt.py                  # canonical PyGMT backend / 正式 PyGMT 后端
-│   └── fonts/                        # bundled publication fonts / 内置论文绘图字体
+├── fonts/                            # bundled publication fonts / 内置论文绘图字体
 ├── lib/
 │   ├── pygmt_io.py                   # compatibility import / 兼容导入
 │   ├── pygmt_geo.py                  # spatial processing / 空间处理
 │   └── pygmt_visual.py               # compatibility import / 兼容导入
-├── plot_defo_dem_optic/              # deformation map workflow / 形变地图流程
-├── plot_defo_profile/                # map and profile workflow / 地图与剖面流程
-├── plot_defo_timeseries_map/          # spatial time-series panels / 空间时序子图
-├── plot_defo_timeseries_aux/          # deformation and auxiliary series / 形变与辅助时序
+├── config_examples/visualization/deformation_map/         # cfg + data example / 配置与数据示例
+├── config_examples/visualization/deformation_profile/    # cfg + data example / 配置与数据示例
+├── config_examples/visualization/timeseries_map/         # cfg + data example / 配置与数据示例
+├── config_examples/visualization/timeseries_aux/        # cfg + data example / 配置与数据示例
 ├── tests/                            # regression tests / 回归测试
 └── requirements.txt                  # Python dependencies / Python 依赖
 ```
@@ -59,15 +59,31 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - Development entry points: [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).<br>开发入口：上述两个文件。
 - Engineering baseline: [docs/development/README.md](docs/development/README.md).<br>工程规范入口：上述链接。
 - Scientific conventions: [docs/development/scientific_conventions.md](docs/development/scientific_conventions.md).<br>科学数据约定：上述链接。
-- Workflow parameters: [plot_defo_dem_optic.cfg](plot_defo_dem_optic/plot_defo_dem_optic.cfg) and [plot_defo_dem_profile.cfg](plot_defo_profile/plot_defo_dem_profile.cfg).<br>流程参数说明：上述两个示例 cfg。
+- Workflow parameters: [deformation_map.cfg](config_examples/visualization/deformation_map/deformation_map.cfg) and [deformation_profile.cfg](config_examples/visualization/deformation_profile/deformation_profile.cfg).<br>流程参数说明：上述两个示例 cfg。
 
 ## 2. Workflow Overview / 流程总览
 
 ### 2.1 Deformation Map / 形变地图
 
-`plot_defo_dem_optic` converts TIF, lon/lat TXT, or Defsour deformation data to GMT GRD and draws it over a DEM, optical image, or blank basemap.
+The deformation-map workflow converts TIF, lon/lat TXT, or Defsour deformation data to GMT GRD and draws it over a DEM, optical image, or blank basemap.
 
-`plot_defo_dem_optic` 将 TIF、经纬度 TXT 或 Defsour 形变数据转换为 GMT GRD，并叠加到 DEM、光学影像或空白底图。
+形变地图 workflow 将 TIF、经纬度 TXT 或 Defsour 形变数据转换为 GMT GRD，并叠加到 DEM、光学影像或空白底图。
+
+The installed `geodesy-visualization` command is the formal workflow
+orchestrator. All runnable examples are kept under
+`config_examples/visualization/<workflow>/`, with each directory containing
+its cfg and input data.
+
+已安装的 `geodesy-visualization` 命令是正式流程编排入口。所有配置与数据示例
+统一位于 `config_examples/visualization/<workflow>/`。
+
+```bash
+geodesy-visualization deformation-map --config <project>/config/visualization/deformation_map.cfg
+geodesy-visualization deformation-profile --config <project>/config/visualization/deformation_profile.cfg
+geodesy-visualization timeseries-map --config <project>/config/visualization/timeseries_map.cfg
+geodesy-visualization timeseries-aux --config <project>/config/visualization/timeseries_aux.cfg
+geodesy-visualization baseline-network --config <project>/config/visualization/baseline_plot.cfg --case <name>
+```
 
 1. Read and validate the cfg file, including paths, units, color limits, transparency, and styles.<br>读取并校验 cfg 中的路径、单位、色标范围、透明度和样式。
 2. Convert the enabled SBAS and PSI datasets to GMT GRD using windowed raster or chunked table reads.<br>通过栅格窗口或文本分块读取，将启用的 SBAS 和 PSI 数据转换为 GMT GRD。
@@ -76,9 +92,9 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 
 ### 2.2 Deformation Profiles / 形变剖面
 
-`plot_defo_profile` compares two deformation datasets on separate maps and along common named profile tracks.
+The deformation-profile workflow compares two deformation datasets on separate maps and along common named profile tracks.
 
-`plot_defo_profile` 在独立地图和公共命名剖线上对比两套形变数据。
+形变剖面 workflow 在独立地图和公共命名剖线上对比两套形变数据。
 
 1. Normalize both dataset configurations and prepare their GMT grids.<br>归一化两套数据配置并准备 GMT 网格。
 2. Generate evenly spaced named tracks from configured start and end coordinates.<br>根据配置的起止坐标生成等间距命名轨迹。
@@ -99,26 +115,26 @@ pairs. It does not invoke GAMMA or modify Analysis products.
 
 ### 2.4 Library Responsibilities / 函数库职责
 
-`plot_defo_timeseries_map` provides cfg-driven multi-epoch geographic panels. `plot_defo_timeseries_aux` provides a shared-date-axis deformation, fit, precipitation, and temperature figure. Each workflow keeps its example input under its own `data/` directory and writes figures under `result/`.
+The time-series workflows provide cfg-driven geographic panels and shared-date-axis deformation/auxiliary figures. Example inputs live under `config_examples/visualization/<workflow>/data`; project publication outputs belong under `<processing_root>/FIGURES/PUBLICATION/<WORKFLOW>/`.
 
-`plot_defo_timeseries_map` 提供 cfg 驱动的多期地理子图；`plot_defo_timeseries_aux` 提供共享日期轴的形变、拟合、降水和温度组合图。每个流程的示例输入位于自身 `data/` 目录，结果写入 `result/`。
+时序 workflow 提供 cfg 驱动的地理子图和共享日期轴的形变/辅助时序图。示例输入位于 `config_examples/visualization/<workflow>/data`，正式项目图统一位于 `<processing_root>/FIGURES/PUBLICATION/<WORKFLOW>/`。
 
-- `geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
-- `geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
-- `geodesy_visualization/grid_preparation.py`: canonical Adapter-backed GeoTIFF, named TXT, and Defsour preparation for temporary GMT grids, plus source-neutral dataset dispatch.<br>正式负责由 Adapter 驱动的 GeoTIFF、具名 TXT 与 Defsour 临时 GMT 网格准备，以及来源中立的数据集调度。
-- `geodesy_visualization/styles.py`: shared cfg font/colorbar metadata parsers and CPT-reference resolver; the scope contract is documented in `docs/development/style_cfg_contract.md`.<br>统一的 cfg 字体/色标元数据解析器和 CPT 引用解析器；作用域契约见 `docs/development/style_cfg_contract.md`。
-- `geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.11, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.11 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
+- `src/geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
+- `src/geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
+- `src/geodesy_visualization/grid_preparation.py`: canonical Adapter-backed GeoTIFF, named TXT, and Defsour preparation for temporary GMT grids, plus source-neutral dataset dispatch.<br>正式负责由 Adapter 驱动的 GeoTIFF、具名 TXT 与 Defsour 临时 GMT 网格准备，以及来源中立的数据集调度。
+- `src/geodesy_visualization/styles.py`: shared cfg font/colorbar metadata parsers and CPT-reference resolver; the scope contract is documented in `docs/development/style_cfg_contract.md`.<br>统一的 cfg 字体/色标元数据解析器和 CPT 引用解析器；作用域契约见 `docs/development/style_cfg_contract.md`。
+- `src/geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.11, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.11 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: compatibility re-export for grid preparation and geo views; the unused scientific `add_tifs` remains temporarily as a deprecated compatibility API.<br>临时网格准备和地理视图的兼容重导出；无生产调用的科学运算 `add_tifs` 暂作为已弃用兼容 API 保留。
-- `geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
-- `geodesy_visualization/backends/matplotlib.py`: analysis-neutral array panels, target-series figures, InSAR/GNSS comparison composition, and bundled-font registration.<br>正式负责与 Analysis 解耦的数组子图、目标时序图、InSAR/GNSS 对比图组合及内置字体注册。
-- `geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
-- `geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。
-- `geodesy_visualization/workflows/insar/baseline_network.py`: validates Analysis baseline products and atomically publishes the Matplotlib network figure.<br>校验 Analysis 基线产品并原子发布 Matplotlib 基线网络图。
-- `geodesy_visualization/workflows/insar/deformation_map.py`: canonical cfg-driven DEM/optical deformation-map orchestration using formal package grid preparation.<br>正式的 cfg 驱动 DEM/光学形变地图编排，直接使用正式 package 临时网格准备接口。
-- `geodesy_visualization/workflows/insar/deformation_profile.py`: canonical cfg-driven map, shared-track sampling, and line/scatter profile orchestration.<br>正式的 cfg 驱动地图、公共轨迹采样及折线/散点剖面编排。
+- `src/geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
+- `src/geodesy_visualization/backends/matplotlib.py`: analysis-neutral array panels, target-series figures, InSAR/GNSS comparison composition, and bundled-font registration.<br>正式负责与 Analysis 解耦的数组子图、目标时序图、InSAR/GNSS 对比图组合及内置字体注册。
+- `src/geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
+- `src/geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。
+- `src/geodesy_visualization/workflows/insar/baseline_network.py`: validates Analysis baseline products and atomically publishes the Matplotlib network figure.<br>校验 Analysis 基线产品并原子发布 Matplotlib 基线网络图。
+- `src/geodesy_visualization/workflows/insar/deformation_map.py`: canonical cfg-driven DEM/optical deformation-map orchestration using formal package grid preparation.<br>正式的 cfg 驱动 DEM/光学形变地图编排，直接使用正式 package 临时网格准备接口。
+- `src/geodesy_visualization/workflows/insar/deformation_profile.py`: canonical cfg-driven map, shared-track sampling, and line/scatter profile orchestration.<br>正式的 cfg 驱动地图、公共轨迹采样及折线/散点剖面编排。
 - `lib/pygmt_visual.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有绘图器导入路径提供兼容重导出，不包含独立实现。
-- `plot_*/*.py`: workflow implementations not yet migrated, or compatibility CLIs for migrated workflows.<br>尚未迁移的工作流实现，或已迁移工作流的兼容命令行入口。
+- `config_examples/visualization/<workflow>/`: workflow cfg and input-data examples.<br>各工作流的 cfg 与输入数据示例。
 
 ## 3. Dependencies / 依赖环境
 
@@ -170,36 +186,36 @@ gdal_translate --version
 
 ## 4. Quick Start / 快速开始
 
-Paths inside a cfg file are resolved relative to that cfg file rather than the shell's current directory. Bare output filenames are placed under the configured `output_dir`.
+Paths inside a cfg file are resolved from the declared project context rather than the shell's current directory. An explicit `output_dir` remains authoritative; otherwise `project_root`, `project`, and `processing_root` derive `FIGURES/PUBLICATION/<WORKFLOW>`.
 
-cfg 中的相对路径以 cfg 文件目录为基准，而不是终端当前目录；仅包含文件名的输出会写入配置的 `output_dir`。
+cfg 中的路径按声明的项目上下文解析，而不是终端当前目录；显式 `output_dir` 优先，否则由项目、case 和方法根自动生成 `FIGURES/PUBLICATION/<WORKFLOW>`。
 
 ### 4.1 Deformation Map / 形变地图
 
 ```bash
-conda run -n envPlot python plot_defo_dem_optic/plot_defo_dem_optic.py \
-  --config plot_defo_dem_optic/plot_defo_dem_optic.cfg
+conda run -n envPlot geodesy-visualization deformation-map \
+  --config config_examples/visualization/deformation_map/deformation_map.cfg
 ```
 
 ### 4.2 Deformation Profiles / 形变剖面
 
 ```bash
-conda run -n envPlot python plot_defo_profile/plot_defo_dem_profile.py \
-  --config plot_defo_profile/plot_defo_dem_profile.cfg
+conda run -n envPlot geodesy-visualization deformation-profile \
+  --config config_examples/visualization/deformation_profile/deformation_profile.cfg
 ```
 
 ### 4.3 Spatial Time-Series Panels / 空间时序子图
 
 ```bash
-conda run -n envPlot python plot_defo_timeseries_map/plot_defo_timeseries_map.py \
-  --config plot_defo_timeseries_map/plot_defo_timeseries_map.cfg
+conda run -n envPlot geodesy-visualization timeseries-map \
+  --config config_examples/visualization/timeseries_map/timeseries_map.cfg
 ```
 
 ### 4.4 Deformation And Auxiliary Series / 形变与辅助时序
 
 ```bash
-conda run -n envPlot python plot_defo_timeseries_aux/plot_defo_timeseries_aux.py \
-  --config plot_defo_timeseries_aux/plot_defo_timeseries_aux.cfg
+conda run -n envPlot geodesy-visualization timeseries-aux \
+  --config config_examples/visualization/timeseries_aux/timeseries_aux.cfg
 ```
 
 ### 4.5 InSAR Baseline Network / InSAR 基线网络图
@@ -260,7 +276,7 @@ Each example cfg documents every supported key, unit, valid choice, and output o
 ### 6.1 Automated Checks / 自动检查
 
 ```bash
-python -m compileall -q geodesy_visualization lib plot_defo_*
+python -m compileall -q src/geodesy_visualization lib
 python -m unittest discover -s tests -v
 git diff --check
 ```

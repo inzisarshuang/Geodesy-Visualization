@@ -38,6 +38,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--case")
+    parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -53,6 +54,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
             case.baseline_manifest, project_root=case.project_root
         )
         network = read_baseline_network(manifest)
+        if options.dry_run:
+            print(f"dry-run: output={case.output}")
+            return 0
         output = plot_baseline_network(
             network,
             case.output,

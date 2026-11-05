@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import importlib.util
 import sys
 import tempfile
 import unittest
@@ -22,40 +21,21 @@ from geodesy_visualization.workflows.insar import timeseries_map as canonical_ma
 from insar_data_adapter import CanonicalGridWriter, GridMetadata
 
 
-def load_workflow(name: str, relative_path: str):
-    """Load one workflow script without requiring it to be a Python package."""
-    specification = importlib.util.spec_from_file_location(name, REPOSITORY_ROOT / relative_path)
-    if specification is None or specification.loader is None:
-        raise ImportError(relative_path)
-    module = importlib.util.module_from_spec(specification)
-    specification.loader.exec_module(module)
-    return module
-
-
-SPATIAL = load_workflow(
-    "plot_defo_timeseries_map_test_module",
-    "plot_defo_timeseries_map/plot_defo_timeseries_map.py",
-)
-AUXILIARY = load_workflow(
-    "plot_defo_timeseries_aux_test_module",
-    "plot_defo_timeseries_aux/plot_defo_timeseries_aux.py",
-)
+SPATIAL = canonical_map
+AUXILIARY = canonical_aux
 
 
 class SpatialTimeSeriesTests(unittest.TestCase):
-    def test_legacy_script_reexports_canonical_workflow(self) -> None:
-        """Keep the old map script API and default cfg bound to the package workflow."""
-        self.assertIs(SPATIAL.load_config, canonical_map.load_config)
-        self.assertIs(SPATIAL.load_timeseries_table, canonical_map.load_timeseries_table)
-        self.assertIs(SPATIAL.render, canonical_map.render)
-        self.assertIs(SPATIAL.render_canonical, canonical_map.render_canonical)
-        self.assertIs(
-            SPATIAL.render_canonical_grid, canonical_map.render_canonical_grid
-        )
+    def test_default_cfg_is_migrated_example(self) -> None:
+        """Use the package workflow and migrated example configuration."""
         parsed = canonical_map.build_parser().parse_args([])
         self.assertEqual(
             Path(parsed.config),
-            REPOSITORY_ROOT / "plot_defo_timeseries_map" / "plot_defo_timeseries_map.cfg",
+            REPOSITORY_ROOT
+            / "config_examples"
+            / "visualization"
+            / "timeseries_map"
+            / "timeseries_map.cfg",
         )
 
     def test_resolves_file_cpt_relative_to_config(self) -> None:
@@ -346,7 +326,11 @@ class AuxiliaryTimeSeriesTests(unittest.TestCase):
         parsed = canonical_aux.build_parser().parse_args([])
         self.assertEqual(
             Path(parsed.config),
-            REPOSITORY_ROOT / "plot_defo_timeseries_aux" / "plot_defo_timeseries_aux.cfg",
+            REPOSITORY_ROOT
+            / "config_examples"
+            / "visualization"
+            / "timeseries_aux"
+            / "timeseries_aux.cfg",
         )
 
     def test_sorts_dates_and_rejects_duplicates(self) -> None:

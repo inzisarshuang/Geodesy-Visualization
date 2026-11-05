@@ -110,6 +110,25 @@ output = VISUALIZATION/baseline.png
             with self.assertRaisesRegex(ValueError, "--case"):
                 select_baseline_plot_case(many, None)
 
+    def test_method_root_derives_publication_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, manifest, config = self._project(directory)
+            config.write_text(
+                "[project]\n"
+                "root = ../..\n"
+                "[case:main]\n"
+                "project = S1/ASCENDING_128\n"
+                "processing_root = S1/ASCENDING_128/GAMMA\n"
+                f"baseline_manifest = {manifest.relative_to(root).as_posix()}\n",
+                encoding="utf-8",
+            )
+            (case,) = load_baseline_plot_config(config)
+            self.assertEqual(
+                case.output,
+                root
+                / "S1/ASCENDING_128/GAMMA/FIGURES/PUBLICATION/BASELINE/baseline_network.png",
+            )
+
     def test_rejects_structural_and_required_value_errors(self) -> None:
         """Catch ambiguous or incomplete configuration before plotting imports."""
 

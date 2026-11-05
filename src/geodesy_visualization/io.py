@@ -23,9 +23,11 @@ geodesy_visualization.io
             展开 cfg 和环境变量引用，并检测循环引用。
         ``load_key_value_config``:
             严格读取 key=value 或 key:value 配置文件。
+        ``resolve_publication_output_dir``:
+            优先解析显式输出目录，或由方法根生成 FIGURES/PUBLICATION 目录。
         ``validate_config_keys``:
             拒绝未知配置键，并为可能的拼写错误给出建议。
-        ``resolve_path`` / ``resolve_output_path``:
+        ``resolve_path`` / ``resolve_project_dir`` / ``resolve_output_path``:
             根据 cfg 目录和输出目录解析输入、输出路径。
         ``get_required`` / ``get_optional``:
             读取必需或可选配置值。
@@ -55,6 +57,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from geodesy_visualization.styles import parse_font_style as parse_style_block
+from geodesy_visualization.project_layout import VisualizationProjectLayout
 
 
 @contextmanager
@@ -235,6 +238,37 @@ def resolve_path(value: str, base_dir: Path) -> str:
     return str((base_dir / expanded).resolve())
 
 
+def resolve_project_dir(cfg: Dict[str, str], config_file: str | Path) -> Path:
+    """Resolve the project directory from optional project-root and project keys."""
+    source = Path(config_file).expanduser().resolve()
+    root = Path(resolve_path(cfg.get("project_root", "."), source.parent))
+    return Path(resolve_path(cfg.get("project", "."), root))
+
+
+def resolve_publication_output_dir(
+    cfg: Dict[str, str],
+    config_file: str | Path,
+    workflow: str,
+    fallback: str = "result",
+) -> Path:
+    """Resolve explicit output_dir or derive FIGURES/PUBLICATION from method context."""
+
+    source = Path(config_file).expanduser().resolve()
+    base = resolve_project_dir(cfg, source)
+    explicit = cfg.get("output_dir", "").strip()
+    if explicit:
+        return Path(resolve_path(explicit, base))
+    context = ("project_root", "project", "processing_root")
+    if all(cfg.get(key, "").strip() for key in context):
+        layout = VisualizationProjectLayout.bind(
+            resolve_path(cfg["project_root"], source.parent),
+            cfg["project"],
+            cfg["processing_root"],
+        )
+        return layout.publication(workflow)
+    return Path(resolve_path(fallback, base))
+
+
 def resolve_output_path(value: str, output_dir: str, base_dir: Path) -> str:
     """Resolve output paths, placing bare filenames inside output_dir."""
     expanded = Path(os.path.expandvars(os.path.expanduser(value)))
@@ -356,6 +390,7 @@ __all__ = [
     "parse_style_block",
     "replace_dataset",
     "resolve_output_path",
+    "resolve_publication_output_dir",
     "resolve_path",
     "temporary_path",
     "validate_closed_range",

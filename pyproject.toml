@@ -18,6 +18,7 @@ classifiers = [
 ]
 
 [project.scripts]
+geodesy-visualization = "geodesy_visualization.cli:main"
 geodesy-visualization-insar-baseline = "geodesy_visualization.workflows.insar.baseline_cli:main"
 
 [project.optional-dependencies]
@@ -47,13 +48,18 @@ all = [
 version = {attr = "geodesy_visualization.__version__"}
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["geodesy_visualization*"]
-
-[tool.setuptools.package-data]
-geodesy_visualization = [
-  "fonts/*",
-  "fonts/*/*",
-]
 
 [tool.setuptools.data-files]
 "share/geodesy-visualization/config_examples/visualization" = ["config_examples/visualization/*.cfg"]
+"share/geodesy-visualization/config_examples/visualization/deformation_map" = ["config_examples/visualization/deformation_map/*.cfg"]
+"share/geodesy-visualization/config_examples/visualization/deformation_map/data" = ["config_examples/visualization/deformation_map/data/PSI.txt", "config_examples/visualization/deformation_map/data/SBAS.tif", "config_examples/visualization/deformation_map/data/dem.tif", "config_examples/visualization/deformation_map/data/optic.tif"]
+"share/geodesy-visualization/config_examples/visualization/deformation_profile" = ["config_examples/visualization/deformation_profile/*.cfg"]
+"share/geodesy-visualization/config_examples/visualization/deformation_profile/data" = ["config_examples/visualization/deformation_profile/data/ALOS2_AS.txt", "config_examples/visualization/deformation_profile/data/DEM.tif", "config_examples/visualization/deformation_profile/data/S1_AS_Add.tif", "config_examples/visualization/deformation_profile/data/S1_AS_All.tif", "config_examples/visualization/deformation_profile/data/S1_AS_Mask.tif", "config_examples/visualization/deformation_profile/data/S1_AS_Norcia.tif", "config_examples/visualization/deformation_profile/data/S1_AS_Visso.tif"]
+"share/geodesy-visualization/config_examples/visualization/timeseries_aux" = ["config_examples/visualization/timeseries_aux/*.cfg"]
+"share/geodesy-visualization/config_examples/visualization/timeseries_aux/data" = ["config_examples/visualization/timeseries_aux/data/daily_precipitation.txt", "config_examples/visualization/timeseries_aux/data/daily_temperature.txt", "config_examples/visualization/timeseries_aux/data/deformation.txt", "config_examples/visualization/timeseries_aux/data/deformation_fit.txt"]
+"share/geodesy-visualization/config_examples/visualization/timeseries_map" = ["config_examples/visualization/timeseries_map/*.cfg"]
+"share/geodesy-visualization/config_examples/visualization/timeseries_map/data" = ["config_examples/visualization/timeseries_map/data/def_cum_example.xyz", "config_examples/visualization/timeseries_map/data/images.txt"]
+"share/geodesy-visualization/cpt" = ["cpt/*.cpt", "cpt/*.svg"]
+"share/geodesy-visualization/fonts" = ["fonts/*", "fonts/*/*"]

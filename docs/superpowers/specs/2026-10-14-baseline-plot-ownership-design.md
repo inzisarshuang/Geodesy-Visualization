@@ -39,7 +39,7 @@ network text file.
 The canonical module is:
 
 ```text
-geodesy_visualization/workflows/insar/baseline_network.py
+src/geodesy_visualization/workflows/insar/baseline_network.py
 ```
 
 The installed command is:

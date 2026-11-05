@@ -24,9 +24,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from geodesy_visualization.project_layout import VisualizationProjectLayout
+
 
 _CASE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 _KEYS = {
+    "project",
+    "processing_root",
     "baseline_manifest",
     "output",
     "title",
@@ -166,9 +170,10 @@ def load_baseline_plot_config(path: Path) -> tuple[BaselinePlotCase, ...]:
         _unknown(section, source)
         values = dict(defaults)
         values.update((key, value.strip()) for key, value in section.items())
-        missing = [
-            key for key in ("baseline_manifest", "output") if not values.get(key)
-        ]
+        missing = [key for key in ("baseline_manifest",) if not values.get(key)]
+        has_layout = bool(values.get("project") and values.get("processing_root"))
+        if not values.get("output") and not has_layout:
+            missing.append("output or project/processing_root")
         if missing:
             raise ValueError(
                 f"{source}: [{section_name}] missing keys: {', '.join(missing)}"
@@ -181,12 +186,18 @@ def load_baseline_plot_config(path: Path) -> tuple[BaselinePlotCase, ...]:
         )
         if not manifest.is_file() or manifest.stat().st_size == 0:
             raise FileNotFoundError(f"baseline manifest not found or empty: {manifest}")
-        output_value = Path(values["output"]).expanduser()
-        output = _within(
-            output_value if output_value.is_absolute() else root / output_value,
-            root,
-            "plot output",
-        )
+        if values.get("output"):
+            output_value = Path(values["output"]).expanduser()
+            output = _within(
+                output_value if output_value.is_absolute() else root / output_value,
+                root,
+                "plot output",
+            )
+        else:
+            layout = VisualizationProjectLayout.bind(
+                root, values["project"], values["processing_root"]
+            )
+            output = layout.publication("baseline") / "baseline_network.png"
         cases.append(
             BaselinePlotCase(
                 name=name,

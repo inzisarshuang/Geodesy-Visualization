@@ -21,6 +21,7 @@ geodesy_visualization.workflows.insar.timeseries_map
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import subprocess
 import sys
 from pathlib import Path
@@ -45,11 +46,14 @@ from geodesy_visualization.io import (
     parse_int,
     parse_csv_strings,
     resolve_output_path,
+    resolve_publication_output_dir,
+    resolve_project_dir,
     resolve_path,
     temporary_path,
     validate_config_keys,
     validate_numeric_range,
 )
+from geodesy_visualization.resources import resource_path
 from geodesy_visualization.styles import (
     colorbar_metadata_keys,
     font_style_keys,
@@ -65,14 +69,13 @@ from geodesy_visualization.data import (
 )
 
 
-DEFAULT_CONFIG = (
-    Path(__file__).resolve().parents[3]
-    / "plot_defo_timeseries_map"
-    / "plot_defo_timeseries_map.cfg"
+DEFAULT_CONFIG = resource_path(
+    "config_examples", "visualization", "timeseries_map", "timeseries_map.cfg"
 )
 
 
 ALLOWED_KEYS = {
+    "project_root", "project", "processing_root",
     "data_source", "render_mode", "data_file", "dates_file", "canonical_unit",
     "canonical_crs", "grid_interpolation", "grid_transparency",
     "output_dir", "output_file", "region_west", "region_east",
@@ -98,6 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the configuration-only command-line interface."""
     parser = argparse.ArgumentParser(description="Plot multi-epoch deformation map panels.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -106,8 +110,10 @@ def load_config(config_file: str) -> dict[str, object]:
     path = Path(config_file).expanduser().resolve()
     raw = load_key_value_config(str(path))
     validate_config_keys(raw, ALLOWED_KEYS, str(path))
-    base = path.parent
-    output_dir = resolve_path(get_optional(raw, "output_dir", "result"), base)
+    base = resolve_project_dir(raw, path)
+    output_dir = str(
+        resolve_publication_output_dir(raw, path, "timeseries_map")
+    )
     region = [
         parse_float(get_required(raw, "region_west"), 0.0),
         parse_float(get_required(raw, "region_east"), 0.0),
@@ -194,7 +200,7 @@ def load_config(config_file: str) -> dict[str, object]:
             raw, "font_reference_panel_width", "400p"
         ),
         "font_scale": parse_float(get_optional(raw, "font_scale", ""), 1.0),
-        "font_family": get_optional(raw, "font_family", "Helvetica"),
+        "font_family": get_optional(raw, "font_family", "TeX Gyre Heros"),
         "font_bold": parse_bool(get_optional(raw, "font_bold", ""), False),
         "panel_title_font_size": parse_float(
             get_optional(raw, "panel_title_font_size", ""), 18.0
@@ -231,10 +237,10 @@ def load_config(config_file: str) -> dict[str, object]:
         "defaults": parse_font_style(
             raw,
             "default",
-            "16p,Helvetica-Bold",
-            "10p,Helvetica",
-            "12p,Helvetica",
-            default_secondary="10p,Helvetica",
+            "16p,TeX Gyre Heros-Bold",
+            "10p,TeX Gyre Heros",
+            "12p,TeX Gyre Heros",
+            default_secondary="10p,TeX Gyre Heros",
         ),
     }
     if cfg["rows"] < 1 or cfg["columns"] < 1 or cfg["chunk_rows"] < 1:
@@ -766,9 +772,13 @@ def render_canonical_grid(
     return destination
 
 
-def main() -> None:
+def main(arguments: Sequence[str] | None = None) -> None:
     """Load one cfg, read the selected epochs and render the time-series map."""
-    cfg = load_config(build_parser().parse_args().config)
+    args = build_parser().parse_args(arguments)
+    cfg = load_config(args.config)
+    if args.dry_run:
+        print(f"dry-run: output={cfg['output']}")
+        return
     if cfg["data_source"] == "table":
         data = load_timeseries_table(
             str(cfg["data_file"]), str(cfg["dates_file"]), int(cfg["start_epoch"]),

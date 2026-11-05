@@ -101,7 +101,7 @@ class MatplotlibBackendTests(unittest.TestCase):
             gnss_marker="D",
         )
         try:
-            bundled = (REPOSITORY_ROOT / "geodesy_visualization" / "fonts").resolve()
+            bundled = (REPOSITORY_ROOT / "fonts").resolve()
             registered = {
                 Path(entry.fname).resolve()
                 for entry in font_manager.fontManager.ttflist

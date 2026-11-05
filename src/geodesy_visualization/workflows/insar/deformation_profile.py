@@ -31,10 +31,8 @@ geodesy_visualization.workflows.insar.deformation_profile
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-cpt_path = REPOSITORY_ROOT / "cpt"
 
 from geodesy_visualization.geo import extract_profile, generate_tracks, region_from_grd
 from geodesy_visualization.grid_preparation import prepare_dataset_grid
@@ -49,6 +47,8 @@ from geodesy_visualization.io import (
     parse_float,
     parse_int,
     resolve_output_path,
+    resolve_publication_output_dir,
+    resolve_project_dir,
     resolve_path,
     validate_closed_range,
     validate_config_keys,
@@ -63,14 +63,17 @@ from geodesy_visualization.styles import (
     resolve_cpt_reference,
 )
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
+from geodesy_visualization.resources import resource_path
 
 
-DEFAULT_CONFIG = (
-    REPOSITORY_ROOT / "plot_defo_profile" / "plot_defo_dem_profile.cfg"
+cpt_path = resource_path("cpt")
+DEFAULT_CONFIG = resource_path(
+    "config_examples", "visualization", "deformation_profile", "deformation_profile.cfg"
 )
 
 
 ALLOWED_KEYS = {
+    "project_root", "project", "processing_root",
     "output_dir", "projection", "dem_tif", "dem_cpt", "dem_bar_min", "dem_bar_max",
     "defo_cpt", "defo_cpt_reverse", "defo_bar_min", "defo_bar_max", "defo_transparency",
     "add_scale", "map_scale",
@@ -107,8 +110,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         default=str(DEFAULT_CONFIG),
-        help="Path to key=value cfg file. Defaults to plot_defo_dem_profile.cfg beside this script.",
+        help="Path to key=value cfg file. Defaults to the bundled deformation-profile example.",
     )
+    parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -157,9 +161,11 @@ def load_config(config_path: str) -> dict:
     cfg_path = Path(config_path).expanduser().resolve()
     cfg = load_key_value_config(str(cfg_path))
     validate_config_keys(cfg, ALLOWED_KEYS, str(cfg_path))
-    base_dir = cfg_path.parent
+    base_dir = resolve_project_dir(cfg, cfg_path)
 
-    output_dir = resolve_path(get_optional(cfg, "output_dir", "result"), base_dir)
+    output_dir = str(
+        resolve_publication_output_dir(cfg, cfg_path, "deformation_profile")
+    )
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     first_dataset = load_dataset_cfg(
@@ -214,28 +220,28 @@ def load_config(config_path: str) -> dict:
         "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p2p+c20p/20p"),
         "map_scale_height": get_optional(cfg, "map_scale_height", "20p"),
         "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "20p"),
-        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,Helvetica-Bold,black"),
+        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,TeX Gyre Heros-Bold,black"),
         "add_rose": parse_bool(get_optional(cfg, "add_rose", ""), True),
         "default_style": parse_font_style(
             cfg,
             "default",
-            "24p,Helvetica-Bold",
-            "12p,Helvetica-Bold",
-            "20p,Helvetica-Bold",
+            "24p,TeX Gyre Heros-Bold",
+            "12p,TeX Gyre Heros-Bold",
+            "20p,TeX Gyre Heros-Bold",
         ),
         "map_style": parse_font_style(
             cfg,
             "map",
-            "28p,Helvetica-Bold",
-            "14p,Helvetica-Bold",
-            "28p,Helvetica-Bold",
+            "28p,TeX Gyre Heros-Bold",
+            "14p,TeX Gyre Heros-Bold",
+            "28p,TeX Gyre Heros-Bold",
         ),
         "profile_style": parse_font_style(
             cfg,
             "profile",
-            "20p,Helvetica-Bold",
-            "12p,Helvetica",
-            "16p,Helvetica",
+            "20p,TeX Gyre Heros-Bold",
+            "12p,TeX Gyre Heros",
+            "16p,TeX Gyre Heros",
         ),
         "profile_title_prefix": get_optional(cfg, "profile_title_prefix", "Profile"),
         "profile_x_label": get_optional(cfg, "profile_x_label", "Distance (m)"),
@@ -245,7 +251,7 @@ def load_config(config_path: str) -> dict:
         "profile_legend_position": get_optional(cfg, "profile_legend_position", "JTR+o0.5c/-1.2c"),
         "profile_legend_box": get_optional(cfg, "profile_legend_box", "+gwhite+p1.5p"),
         "track_line_pen": get_optional(cfg, "track_line_pen", "2p,black"),
-        "track_label_font": get_optional(cfg, "track_label_font", "20p,Helvetica-Bold"),
+        "track_label_font": get_optional(cfg, "track_label_font", "20p,TeX Gyre Heros-Bold"),
         "track_start_justify": get_optional(cfg, "track_start_justify", "BR"),
         "track_end_justify": get_optional(cfg, "track_end_justify", "BL"),
         "track_end_suffix": get_optional(cfg, "track_end_suffix", "'"),
@@ -412,10 +418,13 @@ def render_profiles(plotter: PyGMTPlotter, cfg: dict, dataset_cfgs: list[dict], 
             plotter.save(profile_output_path(cfg, track_name, "scatter"))
 
 
-def main() -> None:
+def main(arguments: Sequence[str] | None = None) -> None:
     """Prepare both grids, extract common profiles, and render all configured figures."""
-    args = build_parser().parse_args()
+    args = build_parser().parse_args(arguments)
     cfg = load_config(args.config)
+    if args.dry_run:
+        print(f"dry-run: output_dir={cfg['output_dir']}")
+        return
 
     dataset_cfgs = [cfg["dataset1"], cfg["dataset2"]]
     for dataset_cfg in dataset_cfgs:

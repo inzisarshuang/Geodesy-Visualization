@@ -40,9 +40,10 @@ from matplotlib.colorbar import Colorbar
 from matplotlib.figure import Figure
 
 from geodesy_visualization.io import atomic_output_path
+from geodesy_visualization.resources import resource_path
 
 
-_BUNDLED_FONT_DIR = Path(__file__).resolve().parent.parent / "fonts"
+_BUNDLED_FONT_DIR = resource_path("fonts")
 _BUNDLED_FONTS_REGISTERED = False
 DEFAULT_PLOT_FONT = "TeX Gyre Heros"
 

@@ -17,7 +17,7 @@ class ProductionDocstringTests(unittest.TestCase):
         source_files.extend(
             (REPOSITORY_ROOT / "geodesy_visualization").rglob("*.py")
         )
-        source_files.extend(REPOSITORY_ROOT.glob("plot_*/*.py"))
+        source_files.extend(REPOSITORY_ROOT.glob("src/geodesy_visualization/**/*.py"))
         return source_files
 
     def test_every_production_module_has_structured_overview(self) -> None:

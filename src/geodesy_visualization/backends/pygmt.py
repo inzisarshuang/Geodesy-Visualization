@@ -54,10 +54,10 @@ from ..io import gdal_translate, replace_dataset, temporary_path
 
 # 默认基础绘图参数
 DEFAULTS = dict(
-    FONT_TITLE="20p,Helvetica-Bold",
-    FONT_ANNOT_PRIMARY="12p,Helvetica-Bold",
-    FONT_ANNOT_SECONDARY="12p,Helvetica-Bold",
-    FONT_LABEL="20p,Helvetica-Bold",
+    FONT_TITLE="20p,TeX Gyre Heros-Bold",
+    FONT_ANNOT_PRIMARY="12p,TeX Gyre Heros-Bold",
+    FONT_ANNOT_SECONDARY="12p,TeX Gyre Heros-Bold",
+    FONT_LABEL="20p,TeX Gyre Heros-Bold",
 )
 
 
@@ -133,7 +133,7 @@ class PyGMTPlotter:
         参数 (Parameters)
         ----------
         **kwargs :
-            形如 FONT_TITLE="24p,Helvetica-Bold" 等 GMT 配置项键值。
+            形如 FONT_TITLE="24p,TeX Gyre Heros-Bold" 等 GMT 配置项键值。
 
         返回 (Returns)
         -------
@@ -233,7 +233,7 @@ class PyGMTPlotter:
         with pygmt.config(
             MAP_FRAME_TYPE="fancy",
             MAP_FRAME_WIDTH="6p",
-            FONT_ANNOT="18p,Helvetica-Bold",
+            FONT_ANNOT="18p,TeX Gyre Heros-Bold",
             MAP_FRAME_PEN="3p",
             MAP_TICK_PEN="3p",
             FORMAT_GEO_MAP="ddd:mm:ss",
@@ -509,7 +509,12 @@ class PyGMTPlotter:
         return self
 
 
-    def add_colorbar(self, label: str = "Deformation", unit: str = "m/yr") -> "PyGMTPlotter":
+    def add_colorbar(
+        self,
+        label: str = "Deformation",
+        unit: str = "m/yr",
+        tick_interval: float | None = None,
+    ) -> "PyGMTPlotter":
         """
         添加颜色条（底部居中 + 下移；白底 + 边框 + 内边距）。
         Add colorbar at bottom center with outward offset, white background & padding.
@@ -525,12 +530,13 @@ class PyGMTPlotter:
         figure = self._require_figure()
         with pygmt.config(
             FONT_ANNOT_PRIMARY="20p",
-            FONT_ANNOT_SECONDARY="24p, Helvetica-Bold",
+            FONT_ANNOT_SECONDARY="24p, TeX Gyre Heros-Bold",
         ):
+            frame = [f"xa{tick_interval:g}" if tick_interval else "xa", f"y+l{unit}"]
             figure.colorbar(
                 cmap=True,
                 position="JBC+o0c/4c+w12c/0.6c+h",
-                frame=[f"xa+l{label}", f"y+l{unit}"],
+                frame=[frame[0] + f"+l{label}", frame[1]],
                 box="F+gWHITE+p2p+c20p/20p",
             )
 
@@ -544,7 +550,7 @@ class PyGMTPlotter:
         box: str = "F+gWHITE+p2p+c20p/20p",
         scale_height: str = "20p",
         font_annot: str = "20p",
-        font_label: str = "20p,Helvetica-Bold,black",
+        font_label: str = "20p,TeX Gyre Heros-Bold,black",
     ) -> "PyGMTPlotter":
         """
         添加比例尺（上方居中 + 上移；白底 + 边框 + 内边距）。
@@ -610,7 +616,7 @@ class PyGMTPlotter:
         self,
         tracks: Dict[str, Sequence[Sequence[float]]],
         line_pen: str = "2p,black",
-        start_label_font: str = "20p,Helvetica-Bold",
+        start_label_font: str = "20p,TeX Gyre Heros-Bold",
         end_label_font: str | None = None,
         start_justify: str = "BR",
         end_justify: str = "BL",
@@ -627,7 +633,7 @@ class PyGMTPlotter:
         line_pen : str, optional
             轨迹线型（GMT pen 字符串），默认 "2p,black"。
         start_label_font : str, optional
-            起点注记字体（默认 "20p,Helvetica-Bold"）。
+            起点注记字体（默认 "20p,TeX Gyre Heros-Bold"）。
         end_label_font : str or None, optional
             终点注记字体；为 None 时与起点相同。
         start_justify : str, optional

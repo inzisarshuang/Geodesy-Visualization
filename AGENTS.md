@@ -5,9 +5,9 @@ This file defines the rules an AI coding agent or human contributor should read 
 ## Scope
 
 - Keep plotting workflows configuration-driven. Scientific paths, units, scales, color limits, transparency, and styles belong in cfg files, not hidden constants in entry scripts.
-- Reuse `geodesy_visualization/io.py`, `geodesy_visualization/geo.py`, `geodesy_visualization/backends/pygmt.py`, and `lib/pygmt_geo.py` before adding helpers. `lib/pygmt_io.py` and `lib/pygmt_visual.py` are compatibility imports only.
+- Reuse `src/geodesy_visualization/io.py`, `src/geodesy_visualization/geo.py`, `src/geodesy_visualization/backends/pygmt.py`, and `lib/pygmt_geo.py` before adding helpers. `lib/pygmt_io.py` and `lib/pygmt_visual.py` are compatibility imports only.
 - Keep configuration and file mechanics in `geodesy_visualization.io`, figure-oriented grid inspection and profile sampling in `geodesy_visualization.geo`, transitional conversions in `pygmt_geo`, and PyGMT figure composition in `geodesy_visualization.backends.pygmt`.
-- Put canonical cfg-driven workflow orchestration under `geodesy_visualization.workflows`; keep old `plot_*` scripts as compatibility CLIs during migration.
+- Put canonical cfg-driven workflow orchestration under `src/geodesy_visualization/workflows`; keep only the explicitly documented `lib/` modules as compatibility imports.
 - Read canonical HDF5 only through the installed `insar_data_adapter` public API; never import a sibling repository path or access its private HDF5 handle.
 - Before changing or moving `lib/pygmt_geo.py`, read and update `docs/development/pygmt_geo_ownership.md`; do not move that mixed module wholesale.
 - Before adding or renaming font, axis, CPT, colorbar, spacing, or panel-layout cfg keys, read `docs/development/style_cfg_contract.md` and preserve its scope/precedence rules.
@@ -36,7 +36,7 @@ This file defines the rules an AI coding agent or human contributor should read 
 - Target Python 3.10 or newer and use type hints for public functions.
 - Use `pathlib.Path`, context managers, and `subprocess.run(..., check=True)`.
 - Raise actionable exceptions; do not use `assert` for runtime validation.
-- Start every new production Python file with the GAMMA-InSAR-style structured docstring containing the module name, `功能概述:`, and `函数说明:` sections. This includes files under `geodesy_visualization/`. List every public top-level function and class, and update the list whenever an interface is added, removed, or renamed. The required template is in `docs/development/python_rules.md`.
+- Start every new production Python file with the GAMMA-InSAR-style structured docstring containing the module name, `功能概述:`, and `函数说明:` sections. This includes files under `src/geodesy_visualization/`. List every public top-level function and class, and update the list whenever an interface is added, removed, or renamed. The required template is in `docs/development/python_rules.md`.
 - Start every production function and method, including private helpers and entry-script orchestration, with a concise docstring that states its purpose. Public scientific APIs may add bilingual parameter and return details when useful.
 - Entry scripts should parse configuration, orchestrate shared functions, and remain thin.
 
@@ -62,7 +62,7 @@ This file defines the rules an AI coding agent or human contributor should read 
 Run before committing:
 
 ```bash
-python -m py_compile lib/*.py plot_defo_dem_optic/*.py plot_defo_profile/*.py
+python -m py_compile lib/*.py src/geodesy_visualization/**/*.py
 python -m unittest discover -s tests -v
 ```
 

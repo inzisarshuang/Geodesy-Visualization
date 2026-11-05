@@ -26,6 +26,8 @@ geodesy_visualization.workflows.insar.deformation_map
         根据配置以网格或散点模式叠加形变数据。
     ``draw_target_regions``:
         绘制目标区域边框、中心标记和标签。
+    ``parse_kml_clip`` / ``clip_grid_with_kml``:
+        读取 KML 裁剪边界并准备临时裁剪网格。
     ``render_map``:
         组合并保存一个数据集的完整形变地图。
     ``main``:
@@ -36,10 +38,14 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
+import xml.etree.ElementTree as ET
+from copy import copy
+from collections.abc import Sequence
 from pathlib import Path
 import numpy as np
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+from geodesy_visualization.resources import resource_path
 
 from geodesy_visualization.geo import region_from_grd
 from geodesy_visualization.grid_preparation import prepare_dataset_grid
@@ -53,6 +59,8 @@ from geodesy_visualization.io import (
     parse_float,
     parse_int,
     resolve_output_path,
+    resolve_publication_output_dir,
+    resolve_project_dir,
     resolve_path,
     validate_closed_range,
     validate_config_keys,
@@ -68,18 +76,17 @@ from geodesy_visualization.styles import (
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
-DEFAULT_CONFIG = (
-    REPOSITORY_ROOT
-    / "plot_defo_dem_optic"
-    / "plot_defo_dem_optic.cfg"
+DEFAULT_CONFIG = resource_path(
+    "config_examples", "visualization", "deformation_map", "deformation_map.cfg"
 )
 
 
 ALLOWED_KEYS = {
+    "project_root", "project", "processing_root",
     "input_dir", "output_dir", "projection", "region_west", "region_east", "region_south", "region_north",
-    "dem_tif", "optic_tif", "dem_cpt", "dem_bar_min", "dem_bar_max", "defo_cpt",
+    "dem_tif", "optic_tif", "clip_kml", "dem_cpt", "dem_bar_min", "dem_bar_max", "defo_cpt",
     "defo_cpt_reverse", "defo_bar_min", "defo_bar_max", "defo_transparency",
-    "defo_unit", "scatter_style", "scatter_pen", "add_scale", "map_scale",
+    "defo_unit", "defo_colorbar_tick_interval", "scatter_style", "scatter_pen", "add_scale", "map_scale",
     "map_scale_box", "map_scale_height",
     "map_scale_font_annot", "map_scale_font_label", "add_rose", "target_regions",
     "target_region_pen", "target_region_label_font", "target_region_label_offset",
@@ -176,6 +183,70 @@ def parse_target_regions(cfg: dict) -> list[dict]:
     return targets
 
 
+def parse_kml_clip(path: str) -> tuple[np.ndarray, np.ndarray]:
+    """Read the first KML polygon or LatLonBox as longitude/latitude arrays."""
+    root = ET.parse(path).getroot()
+    coordinates = root.findall(".//{*}Polygon//{*}outerBoundaryIs//{*}coordinates")
+    if coordinates:
+        values = coordinates[0].text or ""
+        points = []
+        for item in values.split():
+            fields = item.split(",")
+            if len(fields) >= 2:
+                points.append((float(fields[0]), float(fields[1])))
+        if len(points) < 3:
+            raise ValueError(f"KML polygon must contain at least three coordinates: {path}")
+        return np.asarray([point[0] for point in points]), np.asarray([point[1] for point in points])
+
+    box = root.find(".//{*}LatLonBox")
+    if box is not None:
+        names = ("west", "east", "south", "north")
+        values = {name: box.findtext(f"{{*}}{name}") for name in names}
+        if not all(values.values()):
+            raise ValueError(f"KML LatLonBox is incomplete: {path}")
+        west, east = float(values["west"]), float(values["east"])
+        south, north = float(values["south"]), float(values["north"])
+        return np.asarray([west, east, east, west, west]), np.asarray([south, south, north, north, south])
+    raise ValueError(f"KML contains no Polygon or LatLonBox clip boundary: {path}")
+
+
+def clip_grid_with_kml(grid_path: str, kml_path: str) -> str:
+    """Create a cached GMT grid masked by a KML boundary for older PyGMT versions."""
+    x, y = parse_kml_clip(kml_path)
+    grid = Path(grid_path).expanduser().resolve()
+    stem = grid.with_suffix("")
+    polygon_path = Path(f"{stem}.kmlclip.xy")
+    mask_path = Path(f"{stem}.kmlclip.mask.grd")
+    clipped_path = Path(f"{stem}.kmlclip.grd")
+    polygon_path.write_text(
+        "".join(f"{lon:.12f} {lat:.12f}\n" for lon, lat in zip(x, y)),
+        encoding="ascii",
+    )
+    commands = [
+        [
+            "gmt",
+            "grdmask",
+            str(polygon_path),
+            f"-R{grid}",
+            "-I0.0000001",
+            "-NNaN/1/1",
+            f"-G{mask_path}",
+        ],
+        ["gmt", "grdmath", str(grid), str(mask_path), "MUL", "=", str(clipped_path)],
+    ]
+    if not clipped_path.exists():
+        spacing = subprocess.run(
+            ["gmt", "grdinfo", "-I", str(grid)],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        commands[0][4] = spacing
+        for command in commands:
+            subprocess.run(command, check=True)
+    return str(clipped_path)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser for selecting a map configuration file."""
     parser = argparse.ArgumentParser(
@@ -184,8 +255,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         default=str(DEFAULT_CONFIG),
-        help="Path to key=value cfg file. Defaults to plot_defo_dem_optic.cfg beside this script.",
+        help="Path to key=value cfg file. Defaults to the bundled deformation-map example.",
     )
+    parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -194,10 +266,12 @@ def load_config(config_path: str) -> dict:
     cfg_path = Path(config_path).expanduser().resolve()
     cfg = load_key_value_config(str(cfg_path))
     validate_raw_config(cfg, cfg_path)
-    base_dir = cfg_path.parent
-    cpt_dir = REPOSITORY_ROOT / "cpt"
+    base_dir = resolve_project_dir(cfg, cfg_path)
+    cpt_dir = resource_path("cpt")
 
-    output_dir = resolve_path(get_optional(cfg, "output_dir", "result"), base_dir)
+    output_dir = str(
+        resolve_publication_output_dir(cfg, config_path, "deformation_map")
+    )
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     sbas_grd = resolve_path(get_optional(cfg, "sbas_grd", "SBAS.grd"), base_dir)
@@ -279,6 +353,9 @@ def load_config(config_path: str) -> dict:
     conf = {
         "projection": get_optional(cfg, "projection", "M8i"),
         "region": parse_manual_region(cfg),
+        "clip_kml": resolve_path(get_optional(cfg, "clip_kml", ""), base_dir)
+        if get_optional(cfg, "clip_kml", "")
+        else "",
         "dem_tif": resolve_path(dem_file, base_dir) if dem_file else "",
         "optic_tif": resolve_path(optic_file, base_dir) if optic_file else "",
         "defo_cpt": resolve_cpt_reference(
@@ -291,6 +368,9 @@ def load_config(config_path: str) -> dict:
         "dem_bar_min": parse_float(get_optional(cfg, "dem_bar_min", ""), 700.0),
         "dem_bar_max": parse_float(get_optional(cfg, "dem_bar_max", ""), 2300.0),
         "defo_transparency": int(parse_float(get_optional(cfg, "defo_transparency", ""), 25.0)),
+        "defo_colorbar_tick_interval": parse_float(
+            get_optional(cfg, "defo_colorbar_tick_interval", ""), 0.0
+        ),
         **parse_colorbar_metadata(
             cfg,
             "defo",
@@ -300,7 +380,7 @@ def load_config(config_path: str) -> dict:
         ),
         "target_regions": parse_target_regions(cfg),
         "target_region_pen": get_optional(cfg, "target_region_pen", "1.5p,black"),
-        "target_region_label_font": get_optional(cfg, "target_region_label_font", "12p,Helvetica-Bold,black"),
+        "target_region_label_font": get_optional(cfg, "target_region_label_font", "12p,TeX Gyre Heros-Bold,black"),
         "target_region_label_offset": parse_float(get_optional(cfg, "target_region_label_offset", ""), 0.008),
         "target_region_center_style": get_optional(cfg, "target_region_center_style", "c0.08c"),
         "scatter_style": get_optional(cfg, "scatter_style", "c0.08c"),
@@ -310,21 +390,21 @@ def load_config(config_path: str) -> dict:
         "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p2p+c20p/20p"),
         "map_scale_height": get_optional(cfg, "map_scale_height", "20p"),
         "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "20p"),
-        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,Helvetica-Bold,black"),
+        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,TeX Gyre Heros-Bold,black"),
         "add_rose": parse_bool(get_optional(cfg, "add_rose", ""), True),
         "default_style": parse_font_style(
             cfg,
             "default",
-            "24p,Helvetica-Bold",
-            "12p,Helvetica-Bold",
-            "20p,Helvetica-Bold",
+            "24p,TeX Gyre Heros-Bold",
+            "12p,TeX Gyre Heros-Bold",
+            "20p,TeX Gyre Heros-Bold",
         ),
         "map_style": parse_font_style(
             cfg,
             "map",
-            "28p,Helvetica-Bold",
-            "14p,Helvetica-Bold",
-            "28p,Helvetica-Bold",
+            "28p,TeX Gyre Heros-Bold",
+            "14p,TeX Gyre Heros-Bold",
+            "28p,TeX Gyre Heros-Bold",
         ),
         "sbas": sbas_cfg,
         "psi": psi_cfg,
@@ -455,10 +535,30 @@ def render_map(plotter: PyGMTPlotter, cfg: dict, dataset_cfg: dict) -> None:
     plotter.new()
     plotter.draw_geo_basemap(region=region, projection=cfg["projection"], title=dataset_cfg["title"])
     draw_basemap(plotter, cfg, region, cfg["projection"], dataset_cfg["basemap_mode"])
-    draw_deformation(plotter, cfg, dataset_cfg, region)
+    figure = plotter._require_figure()
+    native_clip = getattr(figure, "clip", None)
+    if cfg["clip_kml"] and callable(native_clip):
+        clip_x, clip_y = parse_kml_clip(cfg["clip_kml"])
+        native_clip(x=clip_x, y=clip_y, projection=cfg["projection"], region=region)
+        try:
+            draw_deformation(plotter, cfg, dataset_cfg, region)
+        finally:
+            native_clip(c=True)
+    else:
+        dataset_to_draw = dataset_cfg
+        if cfg["clip_kml"]:
+            dataset_to_draw = copy(dataset_cfg)
+            dataset_to_draw["grd_path"] = clip_grid_with_kml(
+                dataset_cfg["grd_path"], cfg["clip_kml"]
+            )
+        draw_deformation(plotter, cfg, dataset_to_draw, region)
     draw_target_regions(plotter, cfg)
     if cfg["add_colorbar"]:
-        plotter.add_colorbar(label=cfg["defo_colorbar_label"], unit=cfg["defo_colorbar_unit"])
+        plotter.add_colorbar(
+            label=cfg["defo_colorbar_label"],
+            unit=cfg["defo_colorbar_unit"],
+            tick_interval=cfg["defo_colorbar_tick_interval"] or None,
+        )
     if cfg["add_scale"]:
         plotter.add_scale(
             region=region,
@@ -474,10 +574,13 @@ def render_map(plotter: PyGMTPlotter, cfg: dict, dataset_cfg: dict) -> None:
     plotter.save(dataset_cfg["output"])
 
 
-def main() -> None:
+def main(arguments: Sequence[str] | None = None) -> None:
     """Run grid preparation and render all datasets enabled by the selected cfg file."""
-    args = build_parser().parse_args()
+    args = build_parser().parse_args(arguments)
     cfg = load_config(args.config)
+    if args.dry_run:
+        print(f"dry-run: output_dir={cfg['output_dir']}")
+        return
 
     prepare_dataset_grid(cfg["sbas"])
     if cfg["psi"] is not None:

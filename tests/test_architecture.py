@@ -17,19 +17,19 @@ EXPECTED_LEGACY_GEO_IMPORTS = {}
 EXPECTED_PACKAGE_GEO_IMPORTS = {}
 
 EXPECTED_GRID_PREPARATION_IMPORTS = {
-    "geodesy_visualization/workflows/insar/deformation_map.py": {
+    "src/geodesy_visualization/workflows/insar/deformation_map.py": {
         "prepare_dataset_grid",
     },
-    "geodesy_visualization/workflows/insar/deformation_profile.py": {
+    "src/geodesy_visualization/workflows/insar/deformation_profile.py": {
         "prepare_dataset_grid",
     },
 }
 
 EXPECTED_CANONICAL_GEO_IMPORTS = {
-    "geodesy_visualization/workflows/insar/deformation_map.py": {
+    "src/geodesy_visualization/workflows/insar/deformation_map.py": {
         "region_from_grd",
     },
-    "geodesy_visualization/workflows/insar/deformation_profile.py": {
+    "src/geodesy_visualization/workflows/insar/deformation_profile.py": {
         "extract_profile",
         "generate_tracks",
         "region_from_grd",
@@ -63,7 +63,7 @@ def documented_functions(path: Path) -> set[str]:
 def production_imports(module_name: str) -> dict[str, set[str]]:
     """Find every direct production import from one named geo module."""
     imports: dict[str, set[str]] = {}
-    excluded_roots = {".git", "tests", "lib"}
+    excluded_roots = {".git", ".worktrees", "tests", "lib"}
     for path in REPOSITORY_ROOT.rglob("*.py"):
         relative = path.relative_to(REPOSITORY_ROOT)
         if relative.parts[0] in excluded_roots:

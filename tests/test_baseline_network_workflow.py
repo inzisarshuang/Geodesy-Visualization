@@ -86,7 +86,7 @@ class BaselineNetworkContractTests(_ProductFactory, unittest.TestCase):
         """Catch incomplete products and paths that escape their publication folder."""
 
         cases = (
-            ({"schema_version": 2}, "schema_version"),
+            ({"schema_version": 3}, "schema_version"),
             ({"status": "failed"}, "status"),
             ({"reference_date": "2020-01-01"}, "reference_date"),
             ({"pair_count": 0}, "pair_count"),

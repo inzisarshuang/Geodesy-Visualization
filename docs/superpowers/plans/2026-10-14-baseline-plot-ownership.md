@@ -34,7 +34,7 @@
 ### Task 1: Build the Visualization manifest consumer and renderer
 
 **Files:**
-- Create: `geodesy_visualization/workflows/insar/baseline_network.py`
+- Create: `src/geodesy_visualization/workflows/insar/baseline_network.py`
 - Create: `tests/test_baseline_network_workflow.py`
 
 **Interfaces:**
@@ -89,15 +89,15 @@ Expected: both commands pass.
 - [ ] **Step 9: Commit Task 1 in Geodesy-Visualization**
 
 ```bash
-git add geodesy_visualization/workflows/insar/baseline_network.py tests/test_baseline_network_workflow.py
+git add src/geodesy_visualization/workflows/insar/baseline_network.py tests/test_baseline_network_workflow.py
 git commit -m "Add source-neutral baseline network visualization"
 ```
 
 ### Task 2: Expose the Visualization CFG and installed command
 
 **Files:**
-- Create: `geodesy_visualization/workflows/insar/baseline_config.py`
-- Create: `geodesy_visualization/workflows/insar/baseline_cli.py`
+- Create: `src/geodesy_visualization/workflows/insar/baseline_config.py`
+- Create: `src/geodesy_visualization/workflows/insar/baseline_cli.py`
 - Create: `tests/test_baseline_cli.py`
 - Create: `config_examples/baseline_plot.cfg`
 - Modify: `pyproject.toml`
@@ -156,7 +156,7 @@ Expected: all checks pass; the user-owned untracked CPT files remain unchanged.
 - [ ] **Step 9: Commit Task 2 in Geodesy-Visualization**
 
 ```bash
-git add geodesy_visualization/workflows/insar/baseline_config.py geodesy_visualization/workflows/insar/baseline_cli.py tests/test_baseline_cli.py config_examples/baseline_plot.cfg pyproject.toml README.md
+git add src/geodesy_visualization/workflows/insar/baseline_config.py src/geodesy_visualization/workflows/insar/baseline_cli.py tests/test_baseline_cli.py config_examples/baseline_plot.cfg pyproject.toml README.md
 git commit -m "Expose baseline network visualization workflow"
 ```
 

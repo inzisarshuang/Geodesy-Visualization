@@ -10,7 +10,7 @@ The recommended Conda environment is documented in [README.md](README.md). Confi
 
 1. Reproduce the current behavior with an example cfg.
 2. Keep scientific conventions and existing cfg keys compatible.
-3. Put new reusable behavior in `geodesy_visualization/`; keep compatibility-only modules in `lib/` and task scripts focused on orchestration.
+3. Put new reusable behavior in `src/geodesy_visualization/`; keep compatibility-only modules in `lib/` and task scripts focused on orchestration.
 4. Add or update tests for parser, I/O, and numerical behavior.
 5. Run syntax checks, unit tests, and affected example plots.
 6. Inspect `git diff --check` and generated figures before committing.

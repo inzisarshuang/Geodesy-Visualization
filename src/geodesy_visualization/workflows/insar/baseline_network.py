@@ -15,7 +15,7 @@ geodesy_visualization.workflows.insar.baseline_network
     ``BaselineNetwork``:
         表示可绘制的日期、干涉对和相对垂直基线。
     ``read_baseline_manifest``:
-        读取并校验 schema-1 Analysis 基线清单。
+        读取并校验 Analysis schema-1/schema-2 基线清单。
     ``read_baseline_network``:
         读取四列基线网络并求解各日期相对垂直基线。
     ``plot_baseline_network``:
@@ -96,7 +96,7 @@ def _date(value: object, label: str) -> str:
 def read_baseline_manifest(
     path: Path, *, project_root: Path
 ) -> BaselineManifest:
-    """Read one complete schema-1 Analysis baseline manifest safely."""
+    """Read one complete Analysis baseline manifest safely."""
 
     root = Path(project_root).expanduser().resolve(strict=True)
     source = _inside(Path(path), root, "baseline manifest")
@@ -108,8 +108,8 @@ def read_baseline_manifest(
         raise ValueError(f"invalid baseline manifest JSON {source}: {error}") from error
     if not isinstance(payload, dict):
         raise ValueError("baseline manifest root must be a JSON object")
-    if payload.get("schema_version") != 1:
-        raise ValueError("baseline manifest schema_version must be 1")
+    if payload.get("schema_version") not in {1, 2}:
+        raise ValueError("baseline manifest schema_version must be 1 or 2")
     if payload.get("status") != "complete":
         raise ValueError("baseline manifest status must be complete")
     reference_date = _date(

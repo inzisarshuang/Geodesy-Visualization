@@ -16,6 +16,7 @@ geodesy_visualization.workflows.insar.timeseries_aux
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -27,22 +28,24 @@ from geodesy_visualization.io import (
     load_key_value_config,
     parse_float,
     resolve_output_path,
+    resolve_publication_output_dir,
+    resolve_project_dir,
     resolve_path,
     validate_config_keys,
     validate_numeric_range,
 )
+from geodesy_visualization.resources import resource_path
 from geodesy_visualization.styles import font_style_keys, parse_font_style
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
-DEFAULT_CONFIG = (
-    Path(__file__).resolve().parents[3]
-    / "plot_defo_timeseries_aux"
-    / "plot_defo_timeseries_aux.cfg"
+DEFAULT_CONFIG = resource_path(
+    "config_examples", "visualization", "timeseries_aux", "timeseries_aux.cfg"
 )
 
 
 ALLOWED_KEYS = {
+    "project_root", "project", "processing_root",
     "deformation_file", "fit_file", "precipitation_file", "temperature_file", "output_dir",
     "output_file", "date_start", "date_end", "projection", "defo_min", "defo_max",
     "precip_min", "precip_max", "temperature_min", "temperature_max", "defo_color",
@@ -63,6 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the configuration-only command-line interface."""
     parser = argparse.ArgumentParser(description="Plot deformation with weather auxiliary series.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -71,8 +75,10 @@ def load_config(config_file: str) -> dict[str, object]:
     path = Path(config_file).expanduser().resolve()
     raw = load_key_value_config(str(path))
     validate_config_keys(raw, ALLOWED_KEYS, str(path))
-    base = path.parent
-    output_dir = resolve_path(get_optional(raw, "output_dir", "result"), base)
+    base = resolve_project_dir(raw, path)
+    output_dir = str(
+        resolve_publication_output_dir(raw, path, "timeseries_aux")
+    )
     cfg = {
         "deformation_file": resolve_path(get_required(raw, "deformation_file"), base),
         "fit_file": resolve_path(get_required(raw, "fit_file"), base),
@@ -115,16 +121,16 @@ def load_config(config_file: str) -> dict[str, object]:
         "defo_y_frame": get_optional(raw, "defo_y_frame", "ya10f5g10"),
         "precip_y_frame": get_optional(raw, "precip_y_frame", "ya30"),
         "temperature_y_frame": get_optional(raw, "temperature_y_frame", "ya10"),
-        "primary_time_font": get_optional(raw, "primary_time_font", "6p,Helvetica"),
+        "primary_time_font": get_optional(raw, "primary_time_font", "6p,TeX Gyre Heros"),
         "secondary_tick_length": get_optional(raw, "secondary_tick_length", "0p"),
         "secondary_annot_offset": get_optional(raw, "secondary_annot_offset", "18p"),
         "defaults": {
             **parse_font_style(
                 raw,
                 "default",
-                "14p,Helvetica-Bold",
-                "11p,Helvetica",
-                "11p,Helvetica",
+                "14p,TeX Gyre Heros-Bold",
+                "11p,TeX Gyre Heros",
+                "11p,TeX Gyre Heros",
             ),
             "MAP_FRAME_TYPE": "plain",
             "MAP_FRAME_PEN": "0.8p,black",
@@ -266,9 +272,13 @@ def render(cfg: dict[str, object], series: dict[str, pd.DataFrame]) -> Path:
     return destination
 
 
-def main() -> None:
+def main(arguments: Sequence[str] | None = None) -> None:
     """Load one cfg and render the four configured date-value series."""
-    cfg = load_config(build_parser().parse_args().config)
+    args = build_parser().parse_args(arguments)
+    cfg = load_config(args.config)
+    if args.dry_run:
+        print(f"dry-run: output={cfg['output']}")
+        return
     series = {
         "deformation": read_date_value_table(
             str(cfg["deformation_file"]), "deformation_mm"
