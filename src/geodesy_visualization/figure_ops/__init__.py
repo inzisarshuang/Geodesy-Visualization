@@ -11,14 +11,24 @@ geodesy_visualization.figure_ops
 """
 
 from .config import load_figure_plan
+from .cartography_inputs import (
+    FaultFeature,
+    classify_fault_kinematics,
+    parse_kml_footprints,
+    read_fault_features,
+)
 from .model import FigureOperation, FigurePlan
 from .registry import DEFAULT_REGISTRY, OperationRegistry, OperationSpec
 
 __all__ = [
     "DEFAULT_REGISTRY",
+    "FaultFeature",
     "FigureOperation",
     "FigurePlan",
     "OperationRegistry",
     "OperationSpec",
+    "classify_fault_kinematics",
     "load_figure_plan",
+    "parse_kml_footprints",
+    "read_fault_features",
 ]

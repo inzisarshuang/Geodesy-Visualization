@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"Fea_En": "reverse"},
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[102.0, 35.0], [102.5, 35.5], [103.0, 35.7]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {"Fea_En": "left lateral reverse fault"},
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [[102.1, 35.2], [102.2, 35.4]],
+          [[102.6, 35.8], [102.8, 36.0]]
+        ]
+      }
+    }
+  ]
+}

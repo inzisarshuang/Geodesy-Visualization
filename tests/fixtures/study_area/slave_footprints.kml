@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Placemark>
+      <name>slaves</name>
+      <MultiGeometry>
+        <Polygon>
+          <outerBoundaryIs><LinearRing><coordinates>
+            102.48,35.46 102.35,35.96 102.94,36.06 103.06,35.55 102.48,35.46
+          </coordinates></LinearRing></outerBoundaryIs>
+        </Polygon>
+        <Polygon>
+          <outerBoundaryIs><LinearRing><coordinates>
+            102.38,35.38 102.24,35.89 102.84,35.99 102.97,35.47 102.38,35.38
+          </coordinates></LinearRing></outerBoundaryIs>
+        </Polygon>
+      </MultiGeometry>
+    </Placemark>
+  </Document>
+</kml>
