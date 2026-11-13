@@ -18,6 +18,7 @@ from .cartography_inputs import (
     read_fault_features,
 )
 from .model import FigureOperation, FigurePlan
+from .executor import FigureExecutor, RenderContext
 from .registry import DEFAULT_REGISTRY, OperationRegistry, OperationSpec
 
 __all__ = [
@@ -25,8 +26,10 @@ __all__ = [
     "FaultFeature",
     "FigureOperation",
     "FigurePlan",
+    "FigureExecutor",
     "OperationRegistry",
     "OperationSpec",
+    "RenderContext",
     "classify_fault_kinematics",
     "load_figure_plan",
     "parse_kml_footprints",
