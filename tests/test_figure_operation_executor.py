@@ -7,6 +7,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from types import MappingProxyType
+from unittest.mock import patch
 
 from geodesy_visualization.figure_ops.executor import FigureExecutor
 from geodesy_visualization.figure_ops.model import FigureOperation, FigurePlan
@@ -167,7 +168,7 @@ class FigureOperationExecutorTests(unittest.TestCase):
             )
             self.assertEqual(figure.calls[1][1]["region"], (102.0, 103.6, 35.2, 36.5))
             self.assertEqual(figure.calls[1][1]["projection"], "M8i")
-            self.assertEqual(figure.calls[2][1]["cmap"], "gray")
+            self.assertIs(figure.calls[2][1]["cmap"], True)
 
     def test_apply_is_fluent_and_figure_creation_is_lazy(self) -> None:
         """Return the same executor while creating a Figure only on first use."""
@@ -413,7 +414,32 @@ class FigureOperationExecutorTests(unittest.TestCase):
         legend = next(kwargs for name, kwargs in figure.calls if name == "legend")
         content = legend["spec_content"]
         self.assertLess(content.index("Reverse fault"), content.index("LT-1 reference image"))
+        self.assertIn(" 1.5c Reverse fault", content)
+        self.assertIn(" 1.5c LT-1 reference image", content)
         self.assertEqual(len(executor.context.legend_items), 5)
+
+    def test_automatic_legend_applies_configured_font(self) -> None:
+        """Apply the legend font through a local PyGMT configuration context."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.context.legend_items.append(
+            {
+                "section": "figure.plot.footprint.reference",
+                "spec": "S 0.3c - 1c - 2p,red 1c Reference",
+            }
+        )
+        with patch("pygmt.config") as config:
+            config.return_value.__enter__.return_value = None
+            executor.apply(
+                operation(
+                    "figure.legend",
+                    "legend",
+                    {"position": "x16c/0c", "font": "10p,Helvetica"},
+                    0,
+                )
+            )
+        config.assert_called_once_with(FONT_ANNOT_PRIMARY="10p,Helvetica")
+        self.assertEqual(figure.calls[-1][0], "legend")
 
 
 if __name__ == "__main__":

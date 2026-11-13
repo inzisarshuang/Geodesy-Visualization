@@ -111,7 +111,7 @@ def render_colorbar(context: "RenderContext", operation: "FigureOperation") -> N
     options = _without(dict(operation.options), "enabled")
     source = str(options.pop("source"))
     resource = context.resources[source]
-    options.setdefault("cmap", resource["cmap"])
+    options.setdefault("cmap", True)
     position = _position_code(options.pop("position"), prefix="J")
     length = options.pop("length", None)
     width = options.pop("width", None)

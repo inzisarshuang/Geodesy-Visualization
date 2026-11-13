@@ -70,7 +70,7 @@ def render_footprint(context: "RenderContext", operation: "FigureOperation") -> 
             {
                 "section": operation.section,
                 "label": label,
-                "spec": f"S 0.3c - 1.2c - {pen} 0.7c {label}",
+                "spec": f"S 0.3c - 1.2c - {pen} 1.5c {label}",
             }
         )
 
@@ -110,10 +110,10 @@ def _fault_legend_items(operation: "FigureOperation", options: dict[str, object]
         "other": str(options.get("label_other", "Other fault")),
     }
     specs = {
-        "reverse": "S 0.3c f+r+t 1.2c/0.4c/0.16c white 1.5p,black 0.7c {label}",
-        "normal": "S 0.3c f+l+t 1.2c/0.4c/0.16c black 1.5p,black 0.7c {label}",
-        "strike_slip": "S 0.3c f+l+s 1.2c/0.4c/0.16c white 1.5p,black 0.7c {label}",
-        "other": "S 0.3c - 1.2c - 1p,gray50 0.7c {label}",
+        "reverse": "S 0.3c f+r+t 1.2c/0.4c/0.16c white 1.5p,black 1.5c {label}",
+        "normal": "S 0.3c f+l+t 1.2c/0.4c/0.16c black 1.5p,black 1.5c {label}",
+        "strike_slip": "S 0.3c f+l+s 1.2c/0.4c/0.16c white 1.5p,black 1.5c {label}",
+        "other": "S 0.3c - 1.2c - 1p,gray50 1.5c {label}",
     }
     return [
         {
@@ -248,7 +248,7 @@ def render_legend(context: "RenderContext", operation: "FigureOperation") -> Non
     position = _legend_position(options.pop("position"), options.pop("width", None))
     box_value = options.pop("box", True)
     box = "+gwhite+p1p" if box_value is True else box_value
-    options.pop("font", None)
+    font = options.pop("font", None)
     if not context.legend_items:
         context.warnings.append(f"[{operation.section}] skipped empty automatic legend")
         return
@@ -264,7 +264,13 @@ def render_legend(context: "RenderContext", operation: "FigureOperation") -> Non
         with descriptor:
             descriptor.write("\n".join(str(item["spec"]) for item in context.legend_items))
             descriptor.write("\n")
-        context.figure.legend(spec=str(path), position=position, box=box, **options)
+        if font:
+            from pygmt import config as pygmt_config
+
+            with pygmt_config(FONT_ANNOT_PRIMARY=str(font)):
+                context.figure.legend(spec=str(path), position=position, box=box, **options)
+        else:
+            context.figure.legend(spec=str(path), position=position, box=box, **options)
     finally:
         path.unlink(missing_ok=True)
 
