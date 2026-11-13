@@ -299,6 +299,33 @@ class FigureOperationExecutorTests(unittest.TestCase):
         self.assertEqual(figure.calls[0][1]["position"], "BR")
         self.assertEqual(figure.calls[1][1]["width"], "2c")
 
+    def test_scalebar_applies_configured_annotation_and_label_fonts(self) -> None:
+        """Match scale annotations to the configured bold map typography."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        with patch("pygmt.config") as config:
+            config.return_value.__enter__.return_value = None
+            executor.apply(
+                operation(
+                    "figure.scalebar",
+                    "scalebar",
+                    {
+                        "position": "x17.2c/13.4c",
+                        "length": "50k",
+                        "font_annot_primary": "14p,Helvetica-Bold",
+                        "font_label": "14p,Helvetica-Bold",
+                    },
+                    0,
+                )
+            )
+        config.assert_called_once_with(
+            FONT_ANNOT_PRIMARY="14p,Helvetica-Bold",
+            FONT_LABEL="14p,Helvetica-Bold",
+        )
+        scale = figure.calls[-1][1]
+        self.assertNotIn("font_annot_primary", scale)
+        self.assertNotIn("font_label", scale)
+
     def test_falls_back_to_v010_basemap_embellishments(self) -> None:
         """Translate current CFG names to legacy basemap raw option strings."""
         figure = LegacyRecordingFigure()

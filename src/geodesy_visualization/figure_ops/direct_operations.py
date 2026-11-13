@@ -119,9 +119,22 @@ def render_grdimage(context: "RenderContext", operation: "FigureOperation") -> N
 def render_scalebar(context: "RenderContext", operation: "FigureOperation") -> None:
     """Render a scale bar through the current method or the v0.10 basemap fallback."""
     options = _without(dict(operation.options), "enabled")
+    font_options = {}
+    font_annot = options.pop("font_annot_primary", None)
+    font_label = options.pop("font_label", None)
+    if font_annot:
+        font_options["FONT_ANNOT_PRIMARY"] = str(font_annot)
+    if font_label:
+        font_options["FONT_LABEL"] = str(font_label)
     method = getattr(context.figure, "scalebar", None)
     if callable(method):
-        method(**options)
+        if font_options:
+            from pygmt import config as pygmt_config
+
+            with pygmt_config(**font_options):
+                method(**options)
+        else:
+            method(**options)
         return
     _reject_unsupported_legacy(
         operation,
@@ -137,7 +150,13 @@ def render_scalebar(context: "RenderContext", operation: "FigureOperation") -> N
     if isinstance(label, str) and label:
         raw += f"+l{label}"
     box = options.pop("box", False)
-    context.figure.basemap(map_scale=raw, box=box or None)
+    if font_options:
+        from pygmt import config as pygmt_config
+
+        with pygmt_config(**font_options):
+            context.figure.basemap(map_scale=raw, box=box or None)
+    else:
+        context.figure.basemap(map_scale=raw, box=box or None)
 
 
 def render_directional_rose(

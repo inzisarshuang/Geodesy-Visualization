@@ -154,7 +154,8 @@ DEFAULT_REGISTRY = OperationRegistry(
             required=("position", "length"),
             allowed=(
                 "enabled", "height", "scale_loc", "label", "label_alignment", "unit",
-                "fancy", "vertical", "box", "transparency",
+                "fancy", "vertical", "box", "transparency", "font_annot_primary",
+                "font_label",
             ),
             bools=("enabled", "unit", "fancy", "vertical", "box"),
             floats=("transparency",),
