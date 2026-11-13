@@ -17,6 +17,14 @@ from .cartography_inputs import (
     parse_kml_footprints,
     read_fault_features,
 )
+from .cartography_operations import (
+    render_faults,
+    render_footprint,
+    render_globe_inset,
+    render_legend,
+    render_meca,
+    render_regional_inset,
+)
 from .model import FigureOperation, FigurePlan
 from .executor import FigureExecutor, RenderContext
 from .registry import DEFAULT_REGISTRY, OperationRegistry, OperationSpec
@@ -34,4 +42,10 @@ __all__ = [
     "load_figure_plan",
     "parse_kml_footprints",
     "read_fault_features",
+    "render_faults",
+    "render_footprint",
+    "render_globe_inset",
+    "render_legend",
+    "render_meca",
+    "render_regional_inset",
 ]

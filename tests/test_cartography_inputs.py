@@ -61,11 +61,12 @@ class FaultInputTests(unittest.TestCase):
     def test_flattens_line_and_multiline_features(self) -> None:
         """Convert each line member into an independent drawable fault feature."""
         features = read_fault_features(FIXTURES / "faults.geojson", "Fea_En")
-        self.assertEqual(len(features), 3)
+        self.assertEqual(len(features), 4)
         self.assertEqual(features[0].coordinates.shape, (3, 2))
         self.assertEqual(features[0].kinematics, "reverse")
         self.assertEqual(features[1].kinematics, "left lateral reverse fault")
         self.assertEqual(features[2].kinematics, "left lateral reverse fault")
+        self.assertEqual(features[3].kinematics, "unspecified")
 
     def test_rejects_missing_kinematic_field(self) -> None:
         """Require the configured scientific classification field on every feature."""

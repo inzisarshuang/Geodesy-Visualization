@@ -19,6 +19,14 @@
           [[102.6, 35.8], [102.8, 36.0]]
         ]
       }
+    },
+    {
+      "type": "Feature",
+      "properties": {"Fea_En": "unspecified"},
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[103.0, 35.1], [103.2, 35.3]]
+      }
     }
   ]
 }

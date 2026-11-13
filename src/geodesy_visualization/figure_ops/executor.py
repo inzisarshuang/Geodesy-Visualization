@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .cartography_operations import CARTOGRAPHY_HANDLERS
 from .direct_operations import DIRECT_HANDLERS
 from .model import FigureOperation, FigurePlan
 
@@ -55,6 +56,7 @@ class FigureExecutor:
         self.plan = plan
         self._figure_factory = figure_factory or self._create_pygmt_figure
         self._handlers: dict[str, Handler] = dict(DIRECT_HANDLERS)
+        self._handlers.update(CARTOGRAPHY_HANDLERS)
         if handlers:
             self._handlers.update(handlers)
         self._context: RenderContext | None = None

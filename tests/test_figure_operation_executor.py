@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from types import MappingProxyType
 
 from geodesy_visualization.figure_ops.executor import FigureExecutor
 from geodesy_visualization.figure_ops.model import FigureOperation, FigurePlan
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+STUDY_FIXTURES = REPOSITORY_ROOT / "tests" / "fixtures" / "study_area"
 
 
 class RecordingFigure:
@@ -37,6 +42,30 @@ class RecordingFigure:
     def colorbar(self, **kwargs) -> None:
         """Record one colorbar call."""
         self.calls.append(("colorbar", kwargs))
+
+    def plot(self, **kwargs) -> None:
+        """Record one vector, polygon, or marker call."""
+        self.calls.append(("plot", kwargs))
+
+    def meca(self, **kwargs) -> None:
+        """Record one focal-mechanism call."""
+        self.calls.append(("meca", kwargs))
+
+    def coast(self, **kwargs) -> None:
+        """Record one coast or administrative-boundary call."""
+        self.calls.append(("coast", kwargs))
+
+    @contextmanager
+    def inset(self, **kwargs):
+        """Record entry and exit around one inset operation scope."""
+        self.calls.append(("inset_enter", kwargs))
+        yield
+        self.calls.append(("inset_exit", {}))
+
+    def legend(self, spec=None, **kwargs) -> None:
+        """Read and record the generated legend specification immediately."""
+        content = Path(spec).read_text(encoding="utf-8") if spec else ""
+        self.calls.append(("legend", {"spec_content": content, **kwargs}))
 
     def savefig(self, fname, **kwargs) -> None:
         """Record one output call without writing a file."""
@@ -235,6 +264,156 @@ class FigureOperationExecutorTests(unittest.TestCase):
         self.assertEqual(len(figure.calls), 2)
         self.assertEqual(figure.calls[0][1]["map_scale"], "jBR+w50k+f+u")
         self.assertEqual(figure.calls[1][1]["rose"], "jTR+w2c")
+
+    def test_footprint_draws_each_polygon_and_adds_one_legend_item(self) -> None:
+        """Keep polygon count independent from the scientific legend entry count."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.plot.footprint.slaves",
+                "footprint",
+                {
+                    "data": str(STUDY_FIXTURES / "slave_footprints.kml"),
+                    "pen": "4p,blue",
+                    "label": "LT-1 slave images",
+                },
+                0,
+            )
+        )
+        plot_calls = [kwargs for name, kwargs in figure.calls if name == "plot"]
+        self.assertEqual(len(plot_calls), 2)
+        self.assertTrue(all(len(call["x"]) == 5 for call in plot_calls))
+        self.assertEqual(len(executor.context.legend_items), 1)
+        self.assertEqual(executor.context.legend_items[0]["label"], "LT-1 slave images")
+
+    def test_faults_use_kinematic_styles_and_other_fallback(self) -> None:
+        """Map reverse, strike-slip, and unknown faults to deterministic styles."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.plot.faults",
+                "faults",
+                {
+                    "data": str(STUDY_FIXTURES / "faults.geojson"),
+                    "kinematic_field": "Fea_En",
+                    "pen": "1.5p,black",
+                    "fallback_pen": "1p,gray50",
+                },
+                0,
+            )
+        )
+        calls = [kwargs for name, kwargs in figure.calls if name == "plot"]
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(calls[0]["style"], "f0.8c/0.3c+r+t")
+        self.assertEqual(calls[0]["fill"], "white")
+        self.assertEqual(calls[1]["style"], "f0.8c/0.3c+l+s")
+        self.assertEqual(calls[2]["style"], "f0.8c/0.3c+l+s")
+        self.assertEqual(calls[3]["pen"], "1p,gray50")
+        self.assertNotIn("style", calls[3])
+
+    def test_meca_uses_configured_aki_values(self) -> None:
+        """Pass the configured strike, dip, rake, magnitude, and depth to meca."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.meca.mainshock",
+                "meca",
+                {
+                    "longitude": 102.79,
+                    "latitude": 35.758,
+                    "strike": 353.0,
+                    "dip": 78.0,
+                    "rake": -124.0,
+                    "magnitude": 5.9,
+                    "depth_km": 18.281,
+                    "scale": "0.6c",
+                },
+                0,
+            )
+        )
+        name, kwargs = figure.calls[0]
+        self.assertEqual(name, "meca")
+        self.assertEqual(
+            kwargs["spec"],
+            {"strike": 353.0, "dip": 78.0, "rake": -124.0, "magnitude": 5.9},
+        )
+        self.assertEqual(kwargs["depth"], 18.281)
+
+    def test_insets_contain_coast_and_location_marker_calls(self) -> None:
+        """Render globe and regional location content inside separate inset scopes."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.basemap",
+                "basemap",
+                {"region": (102.0, 103.6, 35.2, 36.5), "projection": "M8i"},
+                0,
+            )
+        ).apply(
+            operation(
+                "figure.inset.globe",
+                "globe_inset",
+                {"position": "TR", "width": "4c", "highlight": "CN"},
+                1,
+            )
+        ).apply(
+            operation(
+                "figure.inset.regional",
+                "regional_inset",
+                {"position": "MR", "width": "6c", "regions": "CN.62,CN.63"},
+                2,
+            )
+        )
+        names = [name for name, _ in figure.calls]
+        self.assertEqual(
+            names,
+            [
+                "basemap",
+                "inset_enter", "coast", "plot", "inset_exit",
+                "inset_enter", "coast", "plot", "inset_exit",
+            ],
+        )
+        self.assertIn("CN+g", figure.calls[2][1]["dcw"])
+        self.assertIn("CN.62,CN.63", figure.calls[6][1]["dcw"])
+
+    def test_automatic_legend_follows_operation_order(self) -> None:
+        """Generate one legend after fault and footprint contributions in that order."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.plot.faults",
+                "faults",
+                {"data": str(STUDY_FIXTURES / "faults.geojson"), "kinematic_field": "Fea_En"},
+                0,
+            )
+        ).apply(
+            operation(
+                "figure.plot.footprint.reference",
+                "footprint",
+                {
+                    "data": str(STUDY_FIXTURES / "reference_footprint.kml"),
+                    "pen": "4p,red",
+                    "label": "LT-1 reference image",
+                },
+                1,
+            )
+        ).apply(
+            operation(
+                "figure.legend",
+                "legend",
+                {"position": "BC", "box": True},
+                2,
+            )
+        )
+        legend = next(kwargs for name, kwargs in figure.calls if name == "legend")
+        content = legend["spec_content"]
+        self.assertLess(content.index("Reverse fault"), content.index("LT-1 reference image"))
+        self.assertEqual(len(executor.context.legend_items), 5)
 
 
 if __name__ == "__main__":
