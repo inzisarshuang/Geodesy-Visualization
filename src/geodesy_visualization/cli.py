@@ -18,26 +18,12 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from geodesy_visualization.workflows.insar.baseline_cli import main as baseline_main
-from geodesy_visualization.workflows.insar.deformation_map import (
-    main as deformation_map_main,
-)
-from geodesy_visualization.workflows.insar.deformation_profile import (
-    main as deformation_profile_main,
-)
-from geodesy_visualization.workflows.insar.timeseries_aux import (
-    main as timeseries_aux_main,
-)
-from geodesy_visualization.workflows.insar.timeseries_map import (
-    main as timeseries_map_main,
-)
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Build the unified configuration-driven visualization CLI."""
     parser = argparse.ArgumentParser(prog="geodesy-visualization")
     subparsers = parser.add_subparsers(dest="workflow", required=True)
     for name, description in (
+        ("study-area", "Render study-area maps with ordered PyGMT figure operations."),
         ("deformation-map", "Render deformation maps over DEM or optical basemaps."),
         ("deformation-profile", "Render deformation maps and profile comparisons."),
         ("timeseries-map", "Render geographic time-series panels."),
@@ -63,16 +49,22 @@ def main(arguments: Sequence[str] | None = None) -> int:
     if options.dry_run:
         forwarded.append("--dry-run")
     if options.workflow == "baseline-network":
+        from geodesy_visualization.workflows.insar.baseline_cli import main
+
         if options.case is not None:
             forwarded.extend(["--case", options.case])
-        return baseline_main(forwarded)
-    dispatch = {
-        "deformation-map": deformation_map_main,
-        "deformation-profile": deformation_profile_main,
-        "timeseries-map": timeseries_map_main,
-        "timeseries-aux": timeseries_aux_main,
-    }
-    dispatch[options.workflow](forwarded)
+        return main(forwarded)
+    if options.workflow == "study-area":
+        from geodesy_visualization.workflows.cartography.study_area import main
+    elif options.workflow == "deformation-map":
+        from geodesy_visualization.workflows.insar.deformation_map import main
+    elif options.workflow == "deformation-profile":
+        from geodesy_visualization.workflows.insar.deformation_profile import main
+    elif options.workflow == "timeseries-map":
+        from geodesy_visualization.workflows.insar.timeseries_map import main
+    else:
+        from geodesy_visualization.workflows.insar.timeseries_aux import main
+    main(forwarded)
     return 0
 
 

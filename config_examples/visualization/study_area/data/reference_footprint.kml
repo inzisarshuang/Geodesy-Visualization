@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document><Placemark><name>Reference footprint</name><Polygon>
+    <outerBoundaryIs><LinearRing><coordinates>
+      13.10,42.80 13.10,43.25 13.70,43.25 13.70,42.80 13.10,42.80
+    </coordinates></LinearRing></outerBoundaryIs>
+  </Polygon></Placemark></Document>
+</kml>

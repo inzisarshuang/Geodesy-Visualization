@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"kinematics": "normal fault"},
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[13.0, 42.9], [13.3, 43.0], [13.7, 43.15]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {"kinematics": "reverse"},
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[13.2, 42.7], [13.4, 42.9], [13.8, 43.0]]
+      }
+    }
+  ]
+}
