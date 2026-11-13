@@ -170,6 +170,27 @@ class FigureOperationExecutorTests(unittest.TestCase):
             self.assertEqual(figure.calls[1][1]["projection"], "M8i")
             self.assertIs(figure.calls[2][1]["cmap"], True)
 
+    def test_grdimage_series_builds_one_shared_cpt(self) -> None:
+        """Use one explicit CPT range for both raster colors and its colorbar."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        with patch("pygmt.makecpt") as makecpt:
+            executor.apply(
+                operation(
+                    "figure.grdimage.dem",
+                    "grdimage",
+                    {
+                        "grid": "/tmp/dem.grd",
+                        "cmap": "gray",
+                        "series": "0/5000/1000",
+                    },
+                    0,
+                )
+            )
+        makecpt.assert_called_once_with(cmap="gray", series="0/5000/1000")
+        self.assertIs(figure.calls[0][1]["cmap"], True)
+        self.assertNotIn("series", figure.calls[0][1])
+
     def test_apply_is_fluent_and_figure_creation_is_lazy(self) -> None:
         """Return the same executor while creating a Figure only on first use."""
         created: list[RecordingFigure] = []
@@ -489,6 +510,70 @@ class FigureOperationExecutorTests(unittest.TestCase):
         config.assert_called_once_with(FONT_ANNOT_PRIMARY="10p,Helvetica")
         self.assertEqual(figure.calls[-1][0], "legend")
         self.assertNotIn("enabled", figure.calls[-1][1])
+
+    def test_automatic_legend_applies_row_gap_and_box_padding(self) -> None:
+        """Keep adjacent legend symbols and labels visually separated."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.context.legend_items.extend(
+            [
+                {"section": "a", "spec": "S 0.3c - 1c - 2p,red 1c First"},
+                {"section": "b", "spec": "S 0.3c - 1c - 2p,blue 1c Second"},
+            ]
+        )
+        executor.apply(
+            operation(
+                "figure.legend",
+                "legend",
+                {
+                    "position": "x16c/0c",
+                    "box": True,
+                    "row_gap": "0.1c",
+                    "padding": "0.25c",
+                },
+                0,
+            )
+        )
+        legend = figure.calls[-1][1]
+        self.assertEqual(legend["spec_content"].count("G 0.1c"), 1)
+        self.assertEqual(legend["box"], "+gwhite+p1p+c0.25c")
+
+    def test_colorbar_applies_intervals_and_fonts(self) -> None:
+        """Keep colorbar tick and typography controls aligned with legacy output."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.context.resources["figure.grdimage.dem"] = {
+            "grid": "/tmp/dem.grd",
+            "cmap": "gray",
+        }
+        executor.context.active_cpt_source = "figure.grdimage.dem"
+        with patch("pygmt.config") as config:
+            config.return_value.__enter__.return_value = None
+            executor.apply(
+                operation(
+                    "figure.colorbar.dem",
+                    "colorbar",
+                    {
+                        "source": "figure.grdimage.dem",
+                        "position": "BC",
+                        "annot": 1000.0,
+                        "tick": 1000.0,
+                        "label": "Elevation",
+                        "unit": "m",
+                        "font_annot_primary": "10p,Helvetica",
+                        "font_label": "12p,Helvetica-Bold",
+                    },
+                    0,
+                )
+            )
+        config.assert_called_once_with(
+            FONT_ANNOT_PRIMARY="10p,Helvetica",
+            FONT_LABEL="12p,Helvetica-Bold",
+        )
+        colorbar = figure.calls[-1][1]
+        self.assertEqual(colorbar["frame"], ["xa1000f1000+lElevation", "y+lm"])
+        self.assertNotIn("annot", colorbar)
+        self.assertNotIn("tick", colorbar)
 
     def test_colorbar_rejects_a_source_whose_cpt_is_no_longer_active(self) -> None:
         """Avoid silently labelling one raster with a later raster's active CPT."""

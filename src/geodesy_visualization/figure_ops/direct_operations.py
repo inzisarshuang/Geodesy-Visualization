@@ -72,6 +72,13 @@ def render_basemap(context: "RenderContext", operation: "FigureOperation") -> No
 def render_grdimage(context: "RenderContext", operation: "FigureOperation") -> None:
     """Render one grid and publish its grid/CPT metadata for dependent operations."""
     options = dict(operation.options)
+    series = options.pop("series", None)
+    configured_cmap = options["cmap"]
+    if series:
+        from pygmt import makecpt
+
+        makecpt(cmap=configured_cmap, series=series)
+        options["cmap"] = True
     if "region" not in options and context.region is not None:
         options["region"] = context.region
     if "projection" not in options and context.projection is not None:
@@ -79,7 +86,8 @@ def render_grdimage(context: "RenderContext", operation: "FigureOperation") -> N
     context.figure.grdimage(**options)
     context.resources[operation.section] = {
         "grid": options["grid"],
-        "cmap": options["cmap"],
+        "cmap": configured_cmap,
+        "series": series,
     }
     context.active_cpt_source = operation.section
 
@@ -153,14 +161,39 @@ def render_colorbar(context: "RenderContext", operation: "FigureOperation") -> N
     options["position"] = position
     label = options.pop("label", None)
     unit = options.pop("unit", None)
+    annot = options.pop("annot", None)
+    tick = options.pop("tick", None)
+    grid = options.pop("grid", None)
+    font_annot = options.pop("font_annot_primary", None)
+    font_label = options.pop("font_label", None)
     frame: list[str] = []
+    x_frame = "x"
+    if annot is None and tick is None and grid is None:
+        x_frame += "a"
+    if annot is not None:
+        x_frame += f"a{annot:g}"
+    if tick is not None:
+        x_frame += f"f{tick:g}"
+    if grid is not None:
+        x_frame += f"g{grid:g}"
     if label:
-        frame.append(f"x+l{label}")
+        x_frame += f"+l{label}"
+    frame.append(x_frame)
     if unit:
         frame.append(f"y+l{unit}")
-    if frame:
-        options["frame"] = frame
-    context.figure.colorbar(**options)
+    options["frame"] = frame
+    font_options = {}
+    if font_annot:
+        font_options["FONT_ANNOT_PRIMARY"] = str(font_annot)
+    if font_label:
+        font_options["FONT_LABEL"] = str(font_label)
+    if font_options:
+        from pygmt import config as pygmt_config
+
+        with pygmt_config(**font_options):
+            context.figure.colorbar(**options)
+    else:
+        context.figure.colorbar(**options)
 
 
 def render_savefig(context: "RenderContext", operation: "FigureOperation") -> None:

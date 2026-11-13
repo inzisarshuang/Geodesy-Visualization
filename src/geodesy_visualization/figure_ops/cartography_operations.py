@@ -253,8 +253,12 @@ def render_legend(context: "RenderContext", operation: "FigureOperation") -> Non
         raise ValueError(f"[{operation.section}] only mode=automatic is currently supported")
     position = _legend_position(options.pop("position"), options.pop("width", None))
     box_value = options.pop("box", True)
+    padding = options.pop("padding", None)
     box = "+gwhite+p1p" if box_value is True else box_value
+    if padding and isinstance(box, str):
+        box += f"+c{padding}"
     font = options.pop("font", None)
+    row_gap = options.pop("row_gap", None)
     if not context.legend_items:
         context.warnings.append(f"[{operation.section}] skipped empty automatic legend")
         return
@@ -268,7 +272,10 @@ def render_legend(context: "RenderContext", operation: "FigureOperation") -> Non
     path = Path(descriptor.name)
     try:
         with descriptor:
-            descriptor.write("\n".join(str(item["spec"]) for item in context.legend_items))
+            separator = f"\nG {row_gap}\n" if row_gap else "\n"
+            descriptor.write(
+                separator.join(str(item["spec"]) for item in context.legend_items)
+            )
             descriptor.write("\n")
         if font:
             from pygmt import config as pygmt_config

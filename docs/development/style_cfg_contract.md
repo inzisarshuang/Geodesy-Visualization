@@ -87,8 +87,11 @@ Rules / 规则：
 - Operation section order is rendering order.<br>操作 section 顺序就是绘图顺序。
 - Use `footprint`, not `coverage`, for product spatial extent.<br>产品空间范围统一使用 `footprint`，不使用 `coverage`。
 - Keep workflow-only keys limited to `enabled`, `source`, `layout`,
-  `processing_root`, `kinematic_field`, `highlight`, and `regions` unless this
-  contract is updated with tests.<br>工作流自定义 key 限定为上述集合；新增前必须更新本契约和测试。
+  `processing_root`, `kinematic_field`, `highlight`, `regions`, `row_gap`, and
+  `padding` unless this contract is updated with tests. `series` follows the
+  public `pygmt.makecpt` name; `font_annot_primary` and `font_label` follow GMT
+  configuration names.<br>工作流自定义 key 限定为上述集合；`series` 沿用
+  `pygmt.makecpt` 公共命名，字体 key 沿用 GMT 配置命名；新增前必须更新本契约和测试。
 - A `source` value is the full identifier of an earlier resource-producing
   operation, such as `figure.grdimage.dem`.<br>`source` 使用资源操作的完整标识符。
 

@@ -98,7 +98,7 @@ DEFAULT_REGISTRY = OperationRegistry(
             required=("grid", "cmap"),
             allowed=(
                 "shading", "region", "projection", "frame", "dpi", "monochrome",
-                "no_clip", "nan_transparent", "transparency",
+                "no_clip", "nan_transparent", "transparency", "series",
             ),
             paths=("grid",),
             bools=("monochrome", "no_clip"),
@@ -174,6 +174,7 @@ DEFAULT_REGISTRY = OperationRegistry(
             allowed=(
                 "enabled", "cmap", "length", "width", "orientation", "label", "unit",
                 "annot", "tick", "grid", "reverse", "box", "transparency",
+                "font_annot_primary", "font_label",
             ),
             bools=("enabled", "reverse", "box"),
             floats=("annot", "tick", "grid", "transparency"),
@@ -204,7 +205,9 @@ DEFAULT_REGISTRY = OperationRegistry(
         _spec(
             r"figure\.legend",
             required=("position",),
-            allowed=("enabled", "box", "width", "font", "mode"),
+            allowed=(
+                "enabled", "box", "width", "font", "mode", "row_gap", "padding",
+            ),
             bools=("enabled", "box"),
             handler="legend",
         ),
