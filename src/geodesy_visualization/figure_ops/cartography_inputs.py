@@ -64,7 +64,10 @@ def parse_kml_footprints(path: str | Path) -> tuple[np.ndarray, ...]:
     except ET.ParseError as exc:
         raise ValueError(f"invalid KML XML in {source}: {exc}") from exc
 
-    coordinate_elements = root.findall(".//{*}Polygon//{*}coordinates")
+    coordinate_elements: list[ET.Element] = []
+    for polygon in root.findall(".//{*}Polygon"):
+        outer = polygon.findall("./{*}outerBoundaryIs//{*}coordinates")
+        coordinate_elements.extend(outer or polygon.findall("./{*}coordinates"))
     polygons: list[np.ndarray] = []
     saw_non_empty = False
     for element in coordinate_elements:

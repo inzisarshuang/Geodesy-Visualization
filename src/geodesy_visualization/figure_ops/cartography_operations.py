@@ -60,6 +60,7 @@ def _marker_options(options: dict[str, object]) -> dict[str, object]:
 def render_footprint(context: "RenderContext", operation: "FigureOperation") -> None:
     """Draw every KML footprint polygon and append one operation-level legend item."""
     options = dict(operation.options)
+    options.pop("enabled", None)
     data = str(options.pop("data"))
     label = str(options.pop("label", "")).strip()
     pen = str(options.get("pen", "1.5p,black"))
@@ -128,6 +129,7 @@ def _fault_legend_items(operation: "FigureOperation", options: dict[str, object]
 def render_faults(context: "RenderContext", operation: "FigureOperation") -> None:
     """Draw fault lines using deterministic kinematic fronts and fallback styling."""
     options = dict(operation.options)
+    options.pop("enabled", None)
     data = str(options.pop("data"))
     field = str(options.pop("kinematic_field"))
     for feature in read_fault_features(data, field):
@@ -143,6 +145,7 @@ def render_faults(context: "RenderContext", operation: "FigureOperation") -> Non
 def render_meca(context: "RenderContext", operation: "FigureOperation") -> None:
     """Draw one configured focal mechanism using the Aki strike/dip/rake convention."""
     options = dict(operation.options)
+    options.pop("enabled", None)
     spec = {
         "strike": options.pop("strike"),
         "dip": options.pop("dip"),
@@ -175,6 +178,7 @@ def _map_center(context: "RenderContext", section: str) -> tuple[float, float]:
 def render_globe_inset(context: "RenderContext", operation: "FigureOperation") -> None:
     """Draw a global orthographic locator and mark the current map center."""
     options = dict(operation.options)
+    options.pop("enabled", None)
     longitude, latitude = _map_center(context, operation.section)
     position = _inset_position(
         options.pop("position"), options.pop("width"), options.pop("height", None)
@@ -203,6 +207,7 @@ def render_globe_inset(context: "RenderContext", operation: "FigureOperation") -
 def render_regional_inset(context: "RenderContext", operation: "FigureOperation") -> None:
     """Draw selected DCW administrative regions and mark the current map center."""
     options = dict(operation.options)
+    options.pop("enabled", None)
     longitude, latitude = _map_center(context, operation.section)
     position = _inset_position(
         options.pop("position"), options.pop("width"), options.pop("height", None)
@@ -242,6 +247,7 @@ def _legend_position(value: object, width: object | None) -> str:
 def render_legend(context: "RenderContext", operation: "FigureOperation") -> None:
     """Render operation-contributed entries through a temporary GMT legend spec."""
     options = dict(operation.options)
+    options.pop("enabled", None)
     mode = str(options.pop("mode", "automatic"))
     if mode != "automatic":
         raise ValueError(f"[{operation.section}] only mode=automatic is currently supported")

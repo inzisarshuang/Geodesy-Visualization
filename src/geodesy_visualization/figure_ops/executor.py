@@ -38,6 +38,7 @@ class RenderContext:
     warnings: list[str] = field(default_factory=list)
     region: tuple[float, float, float, float] | None = None
     projection: str | None = None
+    active_cpt_source: str | None = None
 
 
 Handler = Callable[[RenderContext, FigureOperation], None]
@@ -107,11 +108,15 @@ class FigureExecutor:
 
     def execute(self) -> "FigureExecutor":
         """Validate terminal output placement and execute every operation in order."""
+        enabled_indices = [
+            index for index, operation in enumerate(self.plan.operations)
+            if operation.options.get("enabled", True) is not False
+        ]
         save_indices = [
             index for index, operation in enumerate(self.plan.operations)
             if operation.handler == "savefig" and operation.options.get("enabled", True) is not False
         ]
-        if save_indices and save_indices[-1] != len(self.plan.operations) - 1:
+        if save_indices and save_indices[-1] != enabled_indices[-1]:
             section = self.plan.operations[save_indices[-1]].section
             raise ValueError(f"[{section}] must be the last enabled figure operation")
         if len(save_indices) > 1:

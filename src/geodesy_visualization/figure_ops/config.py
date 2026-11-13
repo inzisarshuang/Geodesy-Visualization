@@ -26,6 +26,7 @@ from .registry import DEFAULT_REGISTRY, OperationRegistry, OperationSpec
 _SECTION_RE = re.compile(r"[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*")
 _PROJECT_KEYS = frozenset({"processing_root"})
 _FIGURE_KEYS = frozenset({"layout"})
+_SUPPORTED_LAYOUTS = frozenset({"publication_sidecar"})
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 
@@ -132,6 +133,11 @@ def load_figure_plan(
     _validate_keys("figure", figure_raw, _FIGURE_KEYS)
     if "layout" not in figure_raw or not figure_raw["layout"].strip():
         raise ValueError("missing required key in [figure]: layout")
+    layout = figure_raw["layout"].strip()
+    if layout not in _SUPPORTED_LAYOUTS:
+        raise ValueError(
+            f"unsupported [figure] layout {layout!r}; choose publication_sidecar"
+        )
 
     base_dir = path.parent
     project = dict(project_raw)
@@ -149,6 +155,10 @@ def load_figure_plan(
         spec = registry.resolve(section)
         tokens = section.split(".")
         options = _normalize_options(section, dict(parser.items(section)), spec, base_dir)
+        for key in spec.path_keys - {"fname"}:
+            value = str(options[key])
+            if not value.startswith("@") and not Path(value).is_file():
+                raise FileNotFoundError(f"[{section}] {key} input not found: {value}")
         operations.append(
             FigureOperation(
                 section=section,
@@ -172,10 +182,23 @@ def load_figure_plan(
                 f"[{operation.section}] source must reference a figure.grdimage operation"
             )
 
+    save_operations = [
+        operation for operation in operations if operation.handler == "savefig"
+    ]
+    if len(save_operations) != 1:
+        raise ValueError("figure plan requires exactly one [figure.savefig] operation")
+    processing_root = project.get("processing_root")
+    if processing_root:
+        output = Path(str(save_operations[0].options["fname"]))
+        if not output.is_relative_to(Path(processing_root)):
+            raise ValueError(
+                "[figure.savefig] fname must remain inside [project] processing_root"
+            )
+
     return FigurePlan(
         config_path=path,
         project=MappingProxyType(project),
-        figure=MappingProxyType({key: value.strip() for key, value in figure_raw.items()}),
+        figure=MappingProxyType({"layout": layout}),
         operations=tuple(operations),
     )
 

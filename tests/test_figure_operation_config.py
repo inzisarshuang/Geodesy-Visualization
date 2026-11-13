@@ -197,10 +197,99 @@ class FigureOperationConfigTests(unittest.TestCase):
                 [figure.grdimage.dem]
                 grid = dem.grd
                 cmap = gray
+                [figure.savefig]
+                fname = result.png
                 """,
             )
             plan = load_figure_plan(cfg)
             self.assertEqual(plan.operations[0].options["source"], "figure.grdimage.dem")
+
+    def test_rejects_missing_input_during_dry_run_validation(self) -> None:
+        """Reject a missing configured input before any Figure is constructed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = self.write_cfg(
+                Path(tmp),
+                """
+                [figure]
+                layout = publication_sidecar
+                [figure.grdimage.dem]
+                grid = missing.grd
+                cmap = gray
+                [figure.savefig]
+                fname = result.png
+                """,
+            )
+            with self.assertRaisesRegex(FileNotFoundError, r"figure\.grdimage\.dem.*grid"):
+                load_figure_plan(cfg)
+
+    def test_rejects_output_outside_processing_root(self) -> None:
+        """Keep configured publication output inside the declared project root."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "project").mkdir()
+            cfg = self.write_cfg(
+                root,
+                """
+                [project]
+                processing_root = project
+                [figure]
+                layout = publication_sidecar
+                [figure.savefig]
+                fname = escaped.png
+                """,
+            )
+            with self.assertRaisesRegex(ValueError, r"figure\.savefig.*processing_root"):
+                load_figure_plan(cfg)
+
+    def test_rejects_unknown_layout_and_missing_savefig(self) -> None:
+        """Require one supported layout and one publication operation."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unknown = self.write_cfg(
+                root,
+                """
+                [figure]
+                layout = sidecar_typo
+                [figure.savefig]
+                fname = result.png
+                """,
+            )
+            with self.assertRaisesRegex(ValueError, "unsupported.*layout"):
+                load_figure_plan(unknown)
+
+            missing = self.write_cfg(
+                root,
+                """
+                [figure]
+                layout = publication_sidecar
+                [figure.basemap]
+                region = 0, 1, 0, 1
+                projection = M8c
+                """,
+            )
+            with self.assertRaisesRegex(ValueError, r"figure\.savefig"):
+                load_figure_plan(missing)
+
+    def test_optional_footprint_accepts_typed_enabled(self) -> None:
+        """Allow one footprint layer to be disabled without deleting its CFG."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "reference.kml").touch()
+            cfg = self.write_cfg(
+                root,
+                """
+                [figure]
+                layout = publication_sidecar
+                [figure.plot.footprint.reference]
+                data = reference.kml
+                pen = 2p,red
+                enabled = no
+                [figure.savefig]
+                fname = result.png
+                """,
+            )
+            plan = load_figure_plan(cfg)
+            self.assertIs(plan.operations[0].options["enabled"], False)
 
 
 if __name__ == "__main__":

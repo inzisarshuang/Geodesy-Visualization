@@ -54,6 +54,24 @@ class FootprintInputTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "malformed coordinate"):
                 parse_kml_footprints(malformed)
 
+    def test_ignores_polygon_inner_boundary_as_a_separate_footprint(self) -> None:
+        """Draw a polygon hole as topology, not as another product footprint."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "hole.kml"
+            path.write_text(
+                """<kml xmlns="http://www.opengis.net/kml/2.2"><Placemark><Polygon>
+                <outerBoundaryIs><LinearRing><coordinates>
+                0,0 2,0 2,2 0,2 0,0
+                </coordinates></LinearRing></outerBoundaryIs>
+                <innerBoundaryIs><LinearRing><coordinates>
+                0.5,0.5 1.5,0.5 1.5,1.5 0.5,1.5 0.5,0.5
+                </coordinates></LinearRing></innerBoundaryIs>
+                </Polygon></Placemark></kml>""",
+                encoding="utf-8",
+            )
+            polygons = parse_kml_footprints(path)
+            self.assertEqual(len(polygons), 1)
+
 
 class FaultInputTests(unittest.TestCase):
     """Verify GDAL-backed line extraction and deterministic fault classification."""

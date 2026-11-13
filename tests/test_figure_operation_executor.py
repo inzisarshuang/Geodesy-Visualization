@@ -266,6 +266,31 @@ class FigureOperationExecutorTests(unittest.TestCase):
         self.assertEqual(figure.calls[0][1]["map_scale"], "jBR+w50k+f+u")
         self.assertEqual(figure.calls[1][1]["rose"], "jTR+w2c")
 
+    def test_v010_fallback_rejects_untranslatable_embellishment_keys(self) -> None:
+        """Fail clearly instead of silently ignoring current-only CFG options."""
+        figure = LegacyRecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        with self.assertRaisesRegex(ValueError, r"figure\.scalebar.*height.*PyGMT v0\.10"):
+            executor.apply(
+                operation(
+                    "figure.scalebar",
+                    "scalebar",
+                    {"position": "BR", "length": "50k", "height": "0.3c"},
+                    0,
+                )
+            )
+        with self.assertRaisesRegex(
+            ValueError, r"figure\.directional_rose.*labels.*PyGMT v0\.10"
+        ):
+            executor.apply(
+                operation(
+                    "figure.directional_rose",
+                    "directional_rose",
+                    {"position": "TR", "width": "2c", "labels": "W,E,S,N"},
+                    1,
+                )
+            )
+
     def test_footprint_draws_each_polygon_and_adds_one_legend_item(self) -> None:
         """Keep polygon count independent from the scientific legend entry count."""
         figure = RecordingFigure()
@@ -287,6 +312,25 @@ class FigureOperationExecutorTests(unittest.TestCase):
         self.assertTrue(all(len(call["x"]) == 5 for call in plot_calls))
         self.assertEqual(len(executor.context.legend_items), 1)
         self.assertEqual(executor.context.legend_items[0]["label"], "LT-1 slave images")
+
+    def test_enabled_option_is_not_forwarded_to_composite_figure_call(self) -> None:
+        """Consume workflow control keys before invoking a PyGMT method."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.plot.footprint.reference",
+                "footprint",
+                {
+                    "data": str(STUDY_FIXTURES / "reference_footprint.kml"),
+                    "pen": "2p,red",
+                    "enabled": True,
+                },
+                0,
+            )
+        )
+        plot = next(kwargs for name, kwargs in figure.calls if name == "plot")
+        self.assertNotIn("enabled", plot)
 
     def test_faults_use_kinematic_styles_and_other_fallback(self) -> None:
         """Map reverse, strike-slip, and unknown faults to deterministic styles."""
@@ -434,12 +478,61 @@ class FigureOperationExecutorTests(unittest.TestCase):
                 operation(
                     "figure.legend",
                     "legend",
-                    {"position": "x16c/0c", "font": "10p,Helvetica"},
+                    {
+                        "position": "x16c/0c",
+                        "font": "10p,Helvetica",
+                        "enabled": True,
+                    },
                     0,
                 )
             )
         config.assert_called_once_with(FONT_ANNOT_PRIMARY="10p,Helvetica")
         self.assertEqual(figure.calls[-1][0], "legend")
+        self.assertNotIn("enabled", figure.calls[-1][1])
+
+    def test_colorbar_rejects_a_source_whose_cpt_is_no_longer_active(self) -> None:
+        """Avoid silently labelling one raster with a later raster's active CPT."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.grdimage.dem",
+                "grdimage",
+                {"grid": "/tmp/dem.grd", "cmap": "gray"},
+                0,
+            )
+        ).apply(
+            operation(
+                "figure.grdimage.optic",
+                "grdimage",
+                {"grid": "/tmp/optic.grd", "cmap": "geo"},
+                1,
+            )
+        )
+        with self.assertRaisesRegex(ValueError, r"figure\.colorbar\.dem.*active CPT"):
+            executor.apply(
+                operation(
+                    "figure.colorbar.dem",
+                    "colorbar",
+                    {"source": "figure.grdimage.dem", "position": "BC"},
+                    2,
+                )
+            )
+
+    def test_disabled_operation_may_follow_savefig(self) -> None:
+        """Treat savefig as terminal among enabled operations only."""
+        figure = RecordingFigure()
+        operations = (
+            operation("figure.savefig", "savefig", {"fname": "/tmp/a.png"}, 0),
+            operation(
+                "figure.colorbar.dem",
+                "colorbar",
+                {"source": "figure.grdimage.dem", "position": "BC", "enabled": False},
+                1,
+            ),
+        )
+        FigureExecutor(plan(*operations), figure_factory=lambda: figure).execute()
+        self.assertEqual([name for name, _ in figure.calls], ["savefig"])
 
 
 if __name__ == "__main__":

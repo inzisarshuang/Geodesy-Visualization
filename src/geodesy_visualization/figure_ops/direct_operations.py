@@ -40,6 +40,20 @@ def _position_code(value: object, prefix: str = "j") -> str:
     return text
 
 
+def _reject_unsupported_legacy(
+    operation: "FigureOperation",
+    options: dict[str, object],
+    supported: frozenset[str],
+) -> None:
+    """Reject CFG keys that the PyGMT v0.10 basemap fallback cannot preserve."""
+    unsupported = sorted(set(options) - supported)
+    if unsupported:
+        raise ValueError(
+            f"[{operation.section}] {', '.join(unsupported)} cannot be translated "
+            "by the installed PyGMT v0.10 fallback"
+        )
+
+
 def render_basemap(context: "RenderContext", operation: "FigureOperation") -> None:
     """Render a basemap and publish its region and projection in the context."""
     options = dict(operation.options)
@@ -67,6 +81,7 @@ def render_grdimage(context: "RenderContext", operation: "FigureOperation") -> N
         "grid": options["grid"],
         "cmap": options["cmap"],
     }
+    context.active_cpt_source = operation.section
 
 
 def render_scalebar(context: "RenderContext", operation: "FigureOperation") -> None:
@@ -76,6 +91,11 @@ def render_scalebar(context: "RenderContext", operation: "FigureOperation") -> N
     if callable(method):
         method(**options)
         return
+    _reject_unsupported_legacy(
+        operation,
+        options,
+        frozenset({"position", "length", "fancy", "unit", "label", "box"}),
+    )
     raw = f"{_position_code(options.pop('position'))}+w{options.pop('length')}"
     if options.pop("fancy", False):
         raw += "+f"
@@ -98,6 +118,11 @@ def render_directional_rose(
     if callable(method):
         method(**options)
         return
+    _reject_unsupported_legacy(
+        operation,
+        options,
+        frozenset({"position", "width", "kind", "box"}),
+    )
     raw = f"{_position_code(options.pop('position'))}+w{options.pop('width')}"
     kind = options.pop("kind", "")
     if kind:
@@ -110,7 +135,11 @@ def render_colorbar(context: "RenderContext", operation: "FigureOperation") -> N
     """Render a source-linked colorbar using arguments compatible with PyGMT v0.10."""
     options = _without(dict(operation.options), "enabled")
     source = str(options.pop("source"))
-    resource = context.resources[source]
+    if context.active_cpt_source != source:
+        raise ValueError(
+            f"[{operation.section}] source {source!r} is not the active CPT; "
+            "place its colorbar before a later figure.grdimage operation"
+        )
     options.setdefault("cmap", True)
     position = _position_code(options.pop("position"), prefix="J")
     length = options.pop("length", None)
