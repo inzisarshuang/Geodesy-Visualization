@@ -89,7 +89,10 @@ DEFAULT_REGISTRY = OperationRegistry(
         _spec(
             r"figure\.basemap",
             required=("region", "projection"),
-            allowed=("frame", "title", "transparency"),
+            allowed=(
+                "frame", "title", "transparency", "font_title",
+                "font_annot_primary", "font_label",
+            ),
             floats=("transparency",),
             handler="basemap",
         ),
@@ -98,10 +101,10 @@ DEFAULT_REGISTRY = OperationRegistry(
             required=("grid", "cmap"),
             allowed=(
                 "shading", "region", "projection", "frame", "dpi", "monochrome",
-                "no_clip", "nan_transparent", "transparency", "series",
+                "no_clip", "nan_transparent", "transparency", "series", "continuous",
             ),
             paths=("grid",),
-            bools=("monochrome", "no_clip"),
+            bools=("monochrome", "no_clip", "continuous"),
             ints=("dpi",),
             floats=("transparency",),
             handler="grdimage",

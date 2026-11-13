@@ -59,6 +59,15 @@ def render_basemap(context: "RenderContext", operation: "FigureOperation") -> No
     options = dict(operation.options)
     context.region = tuple(options["region"])
     context.projection = str(options["projection"])
+    font_options = {}
+    for key, gmt_key in (
+        ("font_title", "FONT_TITLE"),
+        ("font_annot_primary", "FONT_ANNOT_PRIMARY"),
+        ("font_label", "FONT_LABEL"),
+    ):
+        value = options.pop(key, None)
+        if value:
+            font_options[gmt_key] = str(value)
     title = options.pop("title", None)
     if title:
         frame = options.get("frame", "af")
@@ -66,18 +75,32 @@ def render_basemap(context: "RenderContext", operation: "FigureOperation") -> No
             options["frame"] = [*frame, f'+t"{title}"']
         else:
             options["frame"] = [frame, f'+t"{title}"']
-    context.figure.basemap(**options)
+    if font_options:
+        from pygmt import config as pygmt_config
+
+        with pygmt_config(**font_options):
+            context.figure.basemap(**options)
+    else:
+        context.figure.basemap(**options)
 
 
 def render_grdimage(context: "RenderContext", operation: "FigureOperation") -> None:
     """Render one grid and publish its grid/CPT metadata for dependent operations."""
     options = dict(operation.options)
     series = options.pop("series", None)
+    continuous = options.pop("continuous", False)
     configured_cmap = options["cmap"]
+    if continuous and not series:
+        raise ValueError(
+            f"[{operation.section}] continuous requires an explicit series"
+        )
     if series:
         from pygmt import makecpt
 
-        makecpt(cmap=configured_cmap, series=series)
+        makecpt_options = {"cmap": configured_cmap, "series": series}
+        if continuous:
+            makecpt_options["continuous"] = True
+        makecpt(**makecpt_options)
         options["cmap"] = True
     if "region" not in options and context.region is not None:
         options["region"] = context.region
@@ -88,6 +111,7 @@ def render_grdimage(context: "RenderContext", operation: "FigureOperation") -> N
         "grid": options["grid"],
         "cmap": configured_cmap,
         "series": series,
+        "continuous": continuous,
     }
     context.active_cpt_source = operation.section
 

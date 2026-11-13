@@ -183,13 +183,48 @@ class FigureOperationExecutorTests(unittest.TestCase):
                         "grid": "/tmp/dem.grd",
                         "cmap": "gray",
                         "series": "0/5000/1000",
+                        "continuous": True,
                     },
                     0,
                 )
             )
-        makecpt.assert_called_once_with(cmap="gray", series="0/5000/1000")
+        makecpt.assert_called_once_with(
+            cmap="gray", series="0/5000/1000", continuous=True
+        )
         self.assertIs(figure.calls[0][1]["cmap"], True)
         self.assertNotIn("series", figure.calls[0][1])
+        self.assertNotIn("continuous", figure.calls[0][1])
+
+    def test_basemap_applies_configured_coordinate_and_title_fonts(self) -> None:
+        """Apply bold map title, coordinate annotation, and axis-label fonts locally."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        with patch("pygmt.config") as config:
+            config.return_value.__enter__.return_value = None
+            executor.apply(
+                operation(
+                    "figure.basemap",
+                    "basemap",
+                    {
+                        "region": (102.0, 103.6, 35.2, 36.5),
+                        "projection": "M15c",
+                        "title": "Study Area Jishishan",
+                        "font_title": "28p,Helvetica-Bold",
+                        "font_annot_primary": "14p,Helvetica-Bold",
+                        "font_label": "20p,Helvetica-Bold",
+                    },
+                    0,
+                )
+            )
+        config.assert_called_once_with(
+            FONT_TITLE="28p,Helvetica-Bold",
+            FONT_ANNOT_PRIMARY="14p,Helvetica-Bold",
+            FONT_LABEL="20p,Helvetica-Bold",
+        )
+        basemap = figure.calls[-1][1]
+        self.assertNotIn("font_title", basemap)
+        self.assertNotIn("font_annot_primary", basemap)
+        self.assertNotIn("font_label", basemap)
 
     def test_apply_is_fluent_and_figure_creation_is_lazy(self) -> None:
         """Return the same executor while creating a Figure only on first use."""
