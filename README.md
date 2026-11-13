@@ -42,6 +42,9 @@ Geodesy-Visualization/
 │   ├── geo.py                        # view geometry and sampling / 视图几何与采样
 │   ├── data/
 │   │   └── canonical_grid.py         # bounded canonical HDF5 consumer / 标准 HDF5 分块消费层
+│   ├── figure_ops/                    # ordered PyGMT operation plans / 有序 PyGMT 操作计划
+│   ├── workflows/cartography/
+│   │   └── study_area.py              # study-area and footprint workflow / 研究区与 footprint 流程
 │   ├── workflows/insar/
 │   │   ├── baseline_network.py        # baseline-network figure / 基线网络图
 │   │   ├── deformation_map.py        # canonical deformation-map workflow / 正式形变地图流程
@@ -57,6 +60,7 @@ Geodesy-Visualization/
 │   ├── pygmt_geo.py                  # spatial processing / 空间处理
 │   └── pygmt_visual.py               # compatibility import / 兼容导入
 ├── config_examples/visualization/deformation_map/         # cfg + data example / 配置与数据示例
+├── config_examples/visualization/study_area/              # study-area cfg + fixtures / 研究区配置与数据
 ├── config_examples/visualization/deformation_profile/    # cfg + data example / 配置与数据示例
 ├── config_examples/visualization/timeseries_map/         # cfg + data example / 配置与数据示例
 ├── config_examples/visualization/timeseries_aux/        # cfg + data example / 配置与数据示例
@@ -74,11 +78,51 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - Development entry points: [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).<br>开发入口：上述两个文件。
 - Engineering baseline: [docs/development/README.md](docs/development/README.md).<br>工程规范入口：上述链接。
 - Scientific conventions: [docs/development/scientific_conventions.md](docs/development/scientific_conventions.md).<br>科学数据约定：上述链接。
-- Workflow parameters: [deformation_map.cfg](config_examples/visualization/deformation_map/deformation_map.cfg) and [deformation_profile.cfg](config_examples/visualization/deformation_profile/deformation_profile.cfg).<br>流程参数说明：上述两个示例 cfg。
+- Workflow parameters: [study_area.cfg](config_examples/visualization/study_area/study_area.cfg), [deformation_map.cfg](config_examples/visualization/deformation_map/deformation_map.cfg), and [deformation_profile.cfg](config_examples/visualization/deformation_profile/deformation_profile.cfg).<br>流程参数说明：上述示例 cfg。
 
 ## 3. Workflow Overview / 流程总览
 
-### 3.1 Deformation Map / 形变地图
+### 3.1 Study Area And Data Footprints / 研究区与数据 Footprint
+
+The `study-area` workflow represents one figure as an ordered sequence of
+PyGMT-oriented operations. Section names follow
+`figure.<pygmt_method>.<optional_scientific_semantics>.<optional_instance_id>`;
+for example, `figure.grdimage.dem`, `figure.plot.faults`,
+`figure.plot.footprint.reference`, and `figure.meca.mainshock`. The operation
+sections execute from top to bottom, so their order also controls map stacking.
+
+`study-area` 将一张图表示为有序的 PyGMT 操作序列。section 名称统一采用
+`figure.<pygmt方法>.<可选科学语义>.<可选实例名>`，例如
+`figure.grdimage.dem`、`figure.plot.faults`、
+`figure.plot.footprint.reference` 和 `figure.meca.mainshock`。绘图 section
+自上而下执行，因此配置顺序同时决定地图叠加顺序。
+
+`footprint` is the canonical term for a satellite image or data product's
+spatial extent. Add another product by adding another
+`[figure.plot.footprint.<id>]` section; do not use `coverage` as an alias.
+The `publication_sidecar` layout keeps the main map dominant while placing
+location insets and supporting elements in a compact publication composition.
+
+`footprint` 是卫星影像或数据产品空间覆盖范围的统一术语。增加新产品时添加
+新的 `[figure.plot.footprint.<id>]`，不再使用 `coverage` 别名。
+`publication_sidecar` 版式以主地图为核心，并紧凑组织定位 inset 和辅助图面要素。
+
+PyGMT-native parameter names such as `region`, `projection`, `grid`, `cmap`,
+`data`, `pen`, `fill`, `position`, and `transparency` are preserved. The
+workflow adds only bounded project/scientific keys such as `enabled`, `source`,
+`layout`, and `kinematic_field`. Unknown sections and keys fail before drawing.
+
+CFG 尽量直接沿用 `region`、`projection`、`grid`、`cmap`、`data`、`pen`、
+`fill`、`position` 和 `transparency` 等 PyGMT 参数名；工作流只增加
+`enabled`、`source`、`layout` 和 `kinematic_field` 等有限项目/科学字段。
+未知 section 或 key 会在绘图前报错。
+
+```bash
+geodesy-visualization study-area \
+  --config <project>/config/4visualization/study_area_lt1.cfg
+```
+
+### 3.2 Deformation Map / 形变地图
 
 The deformation-map workflow converts TIF, lon/lat TXT, or Defsour deformation data to GMT GRD and draws it over a DEM, optical image, or blank basemap.
 
@@ -94,6 +138,7 @@ its cfg and input data.
 
 ```bash
 geodesy-visualization deformation-map --config <project>/config/4visualization/deformation_map.cfg
+geodesy-visualization study-area --config <project>/config/4visualization/study_area_lt1.cfg
 geodesy-visualization deformation-profile --config <project>/config/4visualization/deformation_profile.cfg
 geodesy-visualization timeseries-map --config <project>/config/4visualization/timeseries_map.cfg
 geodesy-visualization timeseries-aux --config <project>/config/4visualization/timeseries_aux.cfg
@@ -105,7 +150,7 @@ geodesy-visualization baseline-network --config <project>/config/4visualization/
 3. Draw the selected basemap, deformation grid or scatter points, target regions, colorbar, scale, and north arrow.<br>绘制选定底图、形变网格或散点、目标区域、色标、比例尺和指北针。
 4. Save each completed figure through a temporary sibling file and atomic replacement.<br>通过同目录临时文件和原子替换安全保存每张完整图片。
 
-### 3.2 Deformation Profiles / 形变剖面
+### 3.3 Deformation Profiles / 形变剖面
 
 The deformation-profile workflow compares two deformation datasets on separate maps and along common named profile tracks.
 
@@ -116,7 +161,7 @@ The deformation-profile workflow compares two deformation datasets on separate m
 3. Sample both grids along every track and calculate cumulative WGS84 distance.<br>沿每条轨迹采样两套网格并计算 WGS84 累计距离。
 4. Export one map per dataset and optional line or scatter comparison figures per track.<br>为每套数据输出地图，并按剖线选择输出折线或散点对比图。
 
-### 3.3 Baseline Network / 基线网络图
+### 3.4 Baseline Network / 基线网络图
 
 `geodesy-visualization-insar-baseline` reads a completed
 `baseline_manifest.json` from Geodesy-Analysis, validates its referenced
@@ -128,7 +173,7 @@ pairs. It does not invoke GAMMA or modify Analysis products.
 影像节点与已选干涉对。该流程不调用 GAMMA，也不修改 Analysis
 产品。
 
-### 3.4 Library Responsibilities / 函数库职责
+### 3.5 Library Responsibilities / 函数库职责
 
 The time-series workflows provide cfg-driven geographic panels and shared-date-axis deformation/auxiliary figures. Example inputs live under `config_examples/visualization/<workflow>/data`; project publication outputs belong under `<processing_root>/FIGURES/PUBLICATION/<WORKFLOW>/`.
 
@@ -138,6 +183,8 @@ The time-series workflows provide cfg-driven geographic panels and shared-date-a
 - `src/geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
 - `src/geodesy_visualization/grid_preparation.py`: canonical Adapter-backed GeoTIFF, named TXT, and Defsour preparation for temporary GMT grids, plus source-neutral dataset dispatch.<br>正式负责由 Adapter 驱动的 GeoTIFF、具名 TXT 与 Defsour 临时 GMT 网格准备，以及来源中立的数据集调度。
 - `src/geodesy_visualization/styles.py`: shared cfg font/colorbar metadata parsers and CPT-reference resolver; the scope contract is documented in `docs/development/style_cfg_contract.md`.<br>统一的 cfg 字体/色标元数据解析器和 CPT 引用解析器；作用域契约见 `docs/development/style_cfg_contract.md`。
+- `src/geodesy_visualization/figure_ops/`: strict ordered Figure-plan parsing, operation dispatch, footprint/fault preparation, and PyGMT version adapters.<br>严格的有序 Figure 计划解析、操作分派、footprint/断层准备及 PyGMT 版本适配。
+- `src/geodesy_visualization/workflows/cartography/study_area.py`: canonical study-area and product-footprint orchestration.<br>正式的研究区与产品 footprint 制图编排。
 - `src/geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.11, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.11 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: compatibility re-export for grid preparation and geo views; the unused scientific `add_tifs` remains temporarily as a deprecated compatibility API.<br>临时网格准备和地理视图的兼容重导出；无生产调用的科学运算 `add_tifs` 暂作为已弃用兼容 API 保留。
@@ -205,35 +252,54 @@ Paths inside a cfg file are resolved from the declared project context rather th
 
 cfg 中的路径按声明的项目上下文解析，而不是终端当前目录；显式 `output_dir` 优先，否则由项目、case 和方法根自动生成 `FIGURES/PUBLICATION/<WORKFLOW>`。
 
-### 5.1 Deformation Map / 形变地图
+### 5.1 Study Area And Data Footprints / 研究区与数据 Footprint
+
+```bash
+conda run -n envPlot geodesy-visualization study-area \
+  --config config_examples/visualization/study_area/study_area.cfg
+```
+
+Add another image or product by copying a footprint section and changing its
+identifier, data, pen, and label:
+
+增加影像或产品时，只需复制一个 footprint section 并修改实例名、数据、画笔和标签：
+
+```ini
+[figure.plot.footprint.saocom]
+data = data/saocom_footprint.kml
+pen = 3p,green
+label = SAOCOM image footprint
+```
+
+### 5.2 Deformation Map / 形变地图
 
 ```bash
 conda run -n envPlot geodesy-visualization deformation-map \
   --config config_examples/visualization/deformation_map/deformation_map.cfg
 ```
 
-### 5.2 Deformation Profiles / 形变剖面
+### 5.3 Deformation Profiles / 形变剖面
 
 ```bash
 conda run -n envPlot geodesy-visualization deformation-profile \
   --config config_examples/visualization/deformation_profile/deformation_profile.cfg
 ```
 
-### 5.3 Spatial Time-Series Panels / 空间时序子图
+### 5.4 Spatial Time-Series Panels / 空间时序子图
 
 ```bash
 conda run -n envPlot geodesy-visualization timeseries-map \
   --config config_examples/visualization/timeseries_map/timeseries_map.cfg
 ```
 
-### 5.4 Deformation And Auxiliary Series / 形变与辅助时序
+### 5.5 Deformation And Auxiliary Series / 形变与辅助时序
 
 ```bash
 conda run -n envPlot geodesy-visualization timeseries-aux \
   --config config_examples/visualization/timeseries_aux/timeseries_aux.cfg
 ```
 
-### 5.5 InSAR Baseline Network / InSAR 基线网络图
+### 5.6 InSAR Baseline Network / InSAR 基线网络图
 
 Copy [the documented example cfg](config_examples/visualization/baseline_plot.cfg) into the
 research project's `config/4visualization/` directory, set its project root,
