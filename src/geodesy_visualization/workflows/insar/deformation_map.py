@@ -28,8 +28,12 @@ geodesy_visualization.workflows.insar.deformation_map
         绘制目标区域边框、中心标记和标签。
     ``parse_kml_clip`` / ``clip_grid_with_kml``:
         读取 KML 裁剪边界并准备临时裁剪网格。
+    ``parse_kml_features``:
+        读取 KML 中的线/面覆盖边界和点目标。
     ``render_map``:
         组合并保存一个数据集的完整形变地图。
+    ``render_coverage_map``:
+        仅绘制光学底图、KML 覆盖边界和 GNSS 测站。
     ``main``:
         准备启用的数据网格并依次执行地图绘制流程。
 """
@@ -48,7 +52,6 @@ import numpy as np
 from geodesy_visualization.resources import resource_path
 
 from geodesy_visualization.geo import region_from_grd
-from geodesy_visualization.grid_preparation import prepare_dataset_grid
 from geodesy_visualization.io import (
     get_optional,
     get_required,
@@ -77,12 +80,15 @@ from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
 DEFAULT_CONFIG = resource_path(
-    "config_examples", "visualization", "deformation_map", "deformation_map.cfg"
+    "config_examples", "deformation_map", "deformation_map.cfg"
 )
 
 
 ALLOWED_KEYS = {
     "project_root", "project", "processing_root",
+    "map_mode", "coverage_kml", "gnss_kml", "coverage_title", "coverage_output",
+    "coverage_pen", "gnss_style", "gnss_pen", "gnss_labels", "gnss_label_font",
+    "gnss_label_offset",
     "input_dir", "output_dir", "projection", "region_west", "region_east", "region_south", "region_north",
     "dem_tif", "optic_tif", "clip_kml", "dem_cpt", "dem_bar_min", "dem_bar_max", "defo_cpt",
     "defo_cpt_reverse", "defo_bar_min", "defo_bar_max", "defo_transparency",
@@ -274,6 +280,52 @@ def load_config(config_path: str) -> dict:
     )
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
+    map_mode = parse_choice(get_optional(cfg, "map_mode", "deformation"), ("deformation", "coverage"), "map_mode")
+    if map_mode == "coverage":
+        optic_file = get_required(cfg, "optic_tif")
+        output_dir = str(resolve_publication_output_dir(cfg, config_path, "deformation_map"))
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        coverage_output = resolve_output_path(
+            get_optional(cfg, "coverage_output", f"{Path(output_dir) / 'coverage.png'}"),
+            output_dir,
+            base_dir,
+        )
+        conf = {
+            "map_mode": map_mode,
+            "projection": get_optional(cfg, "projection", "M8i"),
+            "region": parse_manual_region(cfg),
+            "optic_tif": resolve_path(optic_file, base_dir),
+            "coverage_kml": [
+                resolve_path(path.strip(), base_dir)
+                for path in get_required(cfg, "coverage_kml").split(";")
+                if path.strip()
+            ],
+            "gnss_kml": resolve_path(get_required(cfg, "gnss_kml"), base_dir),
+            "coverage_title": get_optional(cfg, "coverage_title", "Data coverage"),
+            "coverage_output": coverage_output,
+            "coverage_pen": [
+                value.strip()
+                for value in get_optional(cfg, "coverage_pen", "2p,red").split(";")
+                if value.strip()
+            ],
+            "gnss_style": get_optional(cfg, "gnss_style", "c0.18c"),
+            "gnss_pen": get_optional(cfg, "gnss_pen", "0.5p,white"),
+            "gnss_labels": parse_bool(get_optional(cfg, "gnss_labels", ""), False),
+            "gnss_label_font": get_optional(cfg, "gnss_label_font", "10p,TeXGyreHeros-Bold,black"),
+            "gnss_label_offset": parse_float(get_optional(cfg, "gnss_label_offset", ""), 0.001),
+            "add_scale": parse_bool(get_optional(cfg, "add_scale", ""), True),
+            "map_scale": get_optional(cfg, "map_scale", "JTC+o0c/4c+w5k+f+u"),
+            "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p1p+c10p/10p"),
+            "map_scale_height": get_optional(cfg, "map_scale_height", "10p"),
+            "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "10p"),
+            "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "10p,TeXGyreHeros-Bold,black"),
+            "add_rose": parse_bool(get_optional(cfg, "add_rose", ""), True),
+            "default_style": parse_font_style(cfg, "default", "16p,TeXGyreHeros-Bold", "9p,TeXGyreHeros-Bold", "12p,TeXGyreHeros-Bold"),
+            "map_style": parse_font_style(cfg, "map", "18p,TeXGyreHeros-Bold", "10p,TeXGyreHeros-Bold", "14p,TeXGyreHeros-Bold"),
+            "output_dir": output_dir,
+        }
+        return conf
+
     sbas_grd = resolve_path(get_optional(cfg, "sbas_grd", "SBAS.grd"), base_dir)
     psi_grd = resolve_path(get_optional(cfg, "psi_grd", "PSI.grd"), base_dir)
 
@@ -351,6 +403,7 @@ def load_config(config_path: str) -> dict:
         raise ValueError("optic_tif is required when any basemap mode is 'optic'.")
 
     conf = {
+        "map_mode": map_mode,
         "projection": get_optional(cfg, "projection", "M8i"),
         "region": parse_manual_region(cfg),
         "clip_kml": resolve_path(get_optional(cfg, "clip_kml", ""), base_dir)
@@ -424,6 +477,73 @@ def load_config(config_path: str) -> dict:
         if dataset["deformation_column"] < 0:
             raise ValueError(f"{name}_deformation_column must be non-negative")
     return conf
+
+
+def parse_kml_features(path: str) -> tuple[list[tuple[np.ndarray, np.ndarray]], list[dict]]:
+    """Read KML line/polygon geometries and named point placemarks."""
+    root = ET.parse(path).getroot()
+    geometries = []
+    points = []
+    for placemark in root.iter():
+        if placemark.tag.rsplit("}", 1)[-1] != "Placemark":
+            continue
+        name_node = next((node for node in placemark if node.tag.rsplit("}", 1)[-1] == "name"), None)
+        name = name_node.text.strip() if name_node is not None and name_node.text else ""
+        for node in placemark.iter():
+            tag = node.tag.rsplit("}", 1)[-1]
+            if tag != "coordinates" or not node.text:
+                continue
+            values = []
+            for item in node.text.split():
+                parts = item.split(",")
+                if len(parts) >= 2:
+                    values.append((float(parts[0]), float(parts[1])))
+            if not values:
+                continue
+            x = np.asarray([value[0] for value in values])
+            y = np.asarray([value[1] for value in values])
+            if len(values) == 1:
+                points.append({"name": name, "x": float(x[0]), "y": float(y[0])})
+            else:
+                geometries.append((x, y))
+    return geometries, points
+
+
+def render_coverage_map(plotter: PyGMTPlotter, cfg: dict) -> None:
+    """Render an optical basemap with coverage polygons and GNSS station labels."""
+    region = cfg["region"]
+    if region is None:
+        raise ValueError("coverage maps require region_west/east/south/north.")
+    plotter.new()
+    plotter.draw_geo_basemap(region=region, projection=cfg["projection"], title=cfg["coverage_title"])
+    plotter.draw_optic(optic_tif=cfg["optic_tif"], region=region, projection=cfg["projection"])
+    figure = plotter._require_figure()
+    pens = cfg["coverage_pen"]
+    if len(pens) not in {1, len(cfg["coverage_kml"])}:
+        raise ValueError(
+            "coverage_pen must contain one value or exactly one value per coverage_kml."
+        )
+    for index, coverage_kml in enumerate(cfg["coverage_kml"]):
+        geometries, _ = parse_kml_features(coverage_kml)
+        pen = pens[0] if len(pens) == 1 else pens[index]
+        for x, y in geometries:
+            figure.plot(x=x, y=y, pen=pen)
+    _, stations = parse_kml_features(cfg["gnss_kml"])
+    for station in stations:
+        figure.plot(x=[station["x"]], y=[station["y"]], style=cfg["gnss_style"], fill="yellow", pen=cfg["gnss_pen"])
+        if cfg["gnss_labels"]:
+            figure.text(
+                x=station["x"] + cfg["gnss_label_offset"],
+                y=station["y"] + cfg["gnss_label_offset"],
+                text=station["name"],
+                font=cfg["gnss_label_font"],
+                justify="BL",
+            )
+    if cfg["add_scale"]:
+        plotter.add_scale(region=region, projection=cfg["projection"], map_scale=cfg["map_scale"], box=cfg["map_scale_box"], scale_height=cfg["map_scale_height"], font_annot=cfg["map_scale_font_annot"], font_label=cfg["map_scale_font_label"])
+    if cfg["add_rose"]:
+        plotter.add_rose(region=region, projection=cfg["projection"])
+    plotter.save(cfg["coverage_output"])
 
 
 def draw_basemap(
@@ -581,6 +701,12 @@ def main(arguments: Sequence[str] | None = None) -> None:
     if args.dry_run:
         print(f"dry-run: output_dir={cfg['output_dir']}")
         return
+    if cfg["map_mode"] == "coverage":
+        map_style = {**cfg["default_style"], **cfg["map_style"]}
+        render_coverage_map(PyGMTPlotter(defaults=map_style), cfg)
+        return
+
+    from geodesy_visualization.grid_preparation import prepare_dataset_grid
 
     prepare_dataset_grid(cfg["sbas"])
     if cfg["psi"] is not None:
@@ -604,7 +730,9 @@ __all__ = [
     "optional_path",
     "parse_manual_region",
     "parse_target_regions",
+    "parse_kml_features",
     "render_map",
+    "render_coverage_map",
     "validate_raw_config",
 ]
 

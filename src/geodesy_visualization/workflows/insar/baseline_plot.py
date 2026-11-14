@@ -1,5 +1,5 @@
 """
-geodesy_visualization.workflows.insar.baseline_cli
+geodesy_visualization.workflows.insar.baseline_plot
 =================================================
 
 功能概述:
@@ -18,12 +18,12 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from geodesy_visualization.workflows.insar.baseline_config import (
+from geodesy_visualization.workflows.insar.baseline_plot_config import (
     load_baseline_plot_config,
     select_baseline_plot_case,
 )
-from geodesy_visualization.workflows.insar.baseline_network import (
-    plot_baseline_network,
+from geodesy_visualization.workflows.insar.baseline_plot_core import (
+    render_baseline_plot,
     read_baseline_manifest,
     read_baseline_network,
 )
@@ -33,8 +33,8 @@ def _parser() -> argparse.ArgumentParser:
     """Build the single public configuration-driven command interface."""
 
     parser = argparse.ArgumentParser(
-        prog="geodesy-visualization-insar-baseline",
-        description="Plot an Analysis temporal-perpendicular baseline network.",
+        prog="geodesy-visualization baseline_plot",
+        description="Render an Analysis temporal-perpendicular baseline plot.",
     )
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--case")
@@ -57,7 +57,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         if options.dry_run:
             print(f"dry-run: output={case.output}")
             return 0
-        output = plot_baseline_network(
+        output = render_baseline_plot(
             network,
             case.output,
             title=case.title,
@@ -65,12 +65,31 @@ def main(arguments: Sequence[str] | None = None) -> int:
             figsize=case.figsize,
             y_top_extra=case.y_top_extra,
             y_bottom_extra=case.y_bottom_extra,
-            font_family=case.font_family,
+            font_dir=case.python_font_dir,
+            title_label_font_size=case.title_label_font_size,
+            tick_font_size=case.tick_font_size,
+            legend_font_size=case.legend_font_size,
+            font_weight=case.font_weight,
+            xlabel=case.xlabel,
+            ylabel=case.ylabel,
+            date_format=case.date_format,
+            date_tick_unit=case.date_tick_unit,
+            date_tick_interval=case.date_tick_interval,
+            date_tick_rotation=case.date_tick_rotation,
+            y_tick_interval=case.y_tick_interval,
+            line_color=case.line_color,
+            slave_color=case.slave_color,
+            reference_color=case.reference_color,
+            grid_color=case.grid_color,
+            show_grid=case.show_grid,
+            line_label=case.line_label,
+            slave_label=case.slave_label,
+            reference_label=case.reference_label,
         )
     except (FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
-    print(f"[baselineplot] wrote {output}")
+    print(f"[baseline_plot] wrote {output}")
     return 0
 
 

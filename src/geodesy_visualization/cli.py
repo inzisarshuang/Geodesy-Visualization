@@ -33,8 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--config", required=True, type=Path)
         command.add_argument("--dry-run", action="store_true")
     baseline = subparsers.add_parser(
-        "baseline-network",
-        help="Render an Analysis temporal-perpendicular baseline network.",
+        "baseline_plot",
+        help="Render an Analysis temporal-perpendicular baseline plot.",
     )
     baseline.add_argument("--config", required=True, type=Path)
     baseline.add_argument("--case")
@@ -48,8 +48,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
     forwarded = ["--config", str(options.config)]
     if options.dry_run:
         forwarded.append("--dry-run")
-    if options.workflow == "baseline-network":
-        from geodesy_visualization.workflows.insar.baseline_cli import main
+    if options.workflow == "baseline_plot":
+        from geodesy_visualization.workflows.insar.baseline_plot import main
 
         if options.case is not None:
             forwarded.extend(["--case", options.case])

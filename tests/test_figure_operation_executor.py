@@ -299,8 +299,8 @@ class FigureOperationExecutorTests(unittest.TestCase):
         self.assertEqual(figure.calls[0][1]["position"], "BR")
         self.assertEqual(figure.calls[1][1]["width"], "2c")
 
-    def test_scalebar_applies_configured_annotation_and_label_fonts(self) -> None:
-        """Match scale annotations to the configured bold map typography."""
+    def test_scalebar_applies_configured_fonts_and_body_height(self) -> None:
+        """Match scale typography and bar-body height to publication settings."""
         figure = RecordingFigure()
         executor = FigureExecutor(plan(), figure_factory=lambda: figure)
         with patch("pygmt.config") as config:
@@ -314,6 +314,7 @@ class FigureOperationExecutorTests(unittest.TestCase):
                         "length": "50k",
                         "font_annot_primary": "14p,Helvetica-Bold",
                         "font_label": "14p,Helvetica-Bold",
+                        "map_scale_height": "20p",
                     },
                     0,
                 )
@@ -321,10 +322,12 @@ class FigureOperationExecutorTests(unittest.TestCase):
         config.assert_called_once_with(
             FONT_ANNOT_PRIMARY="14p,Helvetica-Bold",
             FONT_LABEL="14p,Helvetica-Bold",
+            MAP_SCALE_HEIGHT="20p",
         )
         scale = figure.calls[-1][1]
         self.assertNotIn("font_annot_primary", scale)
         self.assertNotIn("font_label", scale)
+        self.assertNotIn("map_scale_height", scale)
 
     def test_falls_back_to_v010_basemap_embellishments(self) -> None:
         """Translate current CFG names to legacy basemap raw option strings."""
@@ -599,6 +602,65 @@ class FigureOperationExecutorTests(unittest.TestCase):
         legend = figure.calls[-1][1]
         self.assertEqual(legend["spec_content"].count("G 0.1c"), 1)
         self.assertEqual(legend["box"], "+gwhite+p1p+c0.25c")
+
+    def test_automatic_legend_applies_configured_symbol_geometry_without_box(self) -> None:
+        """Format fault fronts and footprint lines from one frame-free legend schema."""
+        figure = RecordingFigure()
+        executor = FigureExecutor(plan(), figure_factory=lambda: figure)
+        executor.apply(
+            operation(
+                "figure.plot.faults",
+                "faults",
+                {
+                    "data": str(STUDY_FIXTURES / "faults.geojson"),
+                    "kinematic_field": "Fea_En",
+                },
+                0,
+            )
+        ).apply(
+            operation(
+                "figure.plot.footprint.reference",
+                "footprint",
+                {
+                    "data": str(STUDY_FIXTURES / "reference_footprint.kml"),
+                    "pen": "4p,red",
+                    "label": "LT-1 reference image",
+                },
+                1,
+            )
+        ).apply(
+            operation(
+                "figure.legend",
+                "legend",
+                {
+                    "position": "x16c/0c",
+                    "box": False,
+                    "symbol_offset": "1.8c",
+                    "line_length": "3c",
+                    "front_spacing": "1c",
+                    "front_size": "0.25c",
+                    "text_offset": "4c",
+                },
+                2,
+            )
+        )
+
+        legend = figure.calls[-1][1]
+        content = legend["spec_content"]
+        self.assertIn(
+            "S 1.8c f+l+t 3c/1c/0.25c white 1.5p,black 4c Reverse fault",
+            content,
+        )
+        self.assertIn(
+            "S 1.8c f+l+s 3c/1c/0.25c black 1.5p,black 4c Strike-slip fault",
+            content,
+        )
+        self.assertIn(
+            "S 1.8c - 3c - 4p,red 4c LT-1 reference image",
+            content,
+        )
+        self.assertIs(legend["box"], False)
+        self.assertNotIn("front_size", legend)
 
     def test_colorbar_applies_intervals_and_fonts(self) -> None:
         """Keep colorbar tick and typography controls aligned with legacy output."""

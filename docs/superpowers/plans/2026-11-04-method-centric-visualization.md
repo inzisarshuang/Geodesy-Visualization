@@ -40,7 +40,8 @@
 
 **Interfaces:**
 - Retains: package name `geodesy_visualization`
-- Retains: console scripts `geodesy-visualization` and `geodesy-visualization-insar-baseline`
+- Retains: the single `geodesy-visualization` console script; baseline plotting
+  is exposed only as its `baseline_plot` subcommand.
 
 - [ ] **Step 1:** Add failing architecture tests requiring imports to resolve from `src` and forbidding a second root package.
 - [ ] **Step 2:** Run architecture/import tests and record failures caused by the incomplete move.

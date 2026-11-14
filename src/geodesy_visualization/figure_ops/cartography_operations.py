@@ -71,7 +71,8 @@ def render_footprint(context: "RenderContext", operation: "FigureOperation") -> 
             {
                 "section": operation.section,
                 "label": label,
-                "spec": f"S 0.3c - 1.2c - {pen} 1.5c {label}",
+                "kind": "line",
+                "pen": pen,
             }
         )
 
@@ -110,20 +111,64 @@ def _fault_legend_items(operation: "FigureOperation", options: dict[str, object]
         "strike_slip": str(options.get("label_strike_slip", "Strike-slip fault")),
         "other": str(options.get("label_other", "Other fault")),
     }
-    specs = {
-        "reverse": "S 0.3c f+r+t 1.2c/0.4c/0.16c white 1.5p,black 1.5c {label}",
-        "normal": "S 0.3c f+l+t 1.2c/0.4c/0.16c black 1.5p,black 1.5c {label}",
-        "strike_slip": "S 0.3c f+l+s 1.2c/0.4c/0.16c white 1.5p,black 1.5c {label}",
-        "other": "S 0.3c - 1.2c - 1p,gray50 1.5c {label}",
+    styles = {
+        "reverse": {
+            "symbol": "f+l+t",
+            "fill": options.get("reverse_fill", "white"),
+            "pen": options.get("reverse_pen", options.get("pen", "1.5p,black")),
+        },
+        "normal": {
+            "symbol": "f+l+t",
+            "fill": options.get("normal_fill", "black"),
+            "pen": options.get("normal_pen", options.get("pen", "1.5p,black")),
+        },
+        "strike_slip": {
+            "symbol": "f+l+s",
+            "fill": options.get("strike_slip_fill", "black"),
+            "pen": options.get(
+                "strike_slip_pen", options.get("pen", "1.5p,black")
+            ),
+        },
+        "other": {
+            "symbol": "-",
+            "fill": "-",
+            "pen": options.get("fallback_pen", "1p,gray50"),
+        },
     }
     return [
         {
             "section": operation.section,
             "label": labels[kind],
-            "spec": specs[kind].format(label=labels[kind]),
+            "kind": kind,
+            **styles[kind],
         }
         for kind in ("reverse", "normal", "strike_slip", "other")
     ]
+
+
+def _legend_item_spec(
+    item: dict[str, object],
+    geometry: dict[str, object],
+) -> str:
+    """Format one structured legend item with shared publication geometry."""
+    if "spec" in item:
+        return str(item["spec"])
+    symbol_offset = geometry["symbol_offset"]
+    line_length = geometry["line_length"]
+    text_offset = geometry["text_offset"]
+    label = item["label"]
+    if item["kind"] in {"reverse", "normal", "strike_slip"}:
+        size = (
+            f"{line_length}/{geometry['front_spacing']}/{geometry['front_size']}"
+        )
+        return (
+            f"S {symbol_offset} {item['symbol']} {size} {item['fill']} "
+            f"{item['pen']} {text_offset} {label}"
+        )
+    return (
+        f"S {symbol_offset} - {line_length} - {item['pen']} "
+        f"{text_offset} {label}"
+    )
 
 
 def render_faults(context: "RenderContext", operation: "FigureOperation") -> None:
@@ -259,6 +304,13 @@ def render_legend(context: "RenderContext", operation: "FigureOperation") -> Non
         box += f"+c{padding}"
     font = options.pop("font", None)
     row_gap = options.pop("row_gap", None)
+    geometry = {
+        "symbol_offset": options.pop("symbol_offset", "0.3c"),
+        "line_length": options.pop("line_length", "1.2c"),
+        "front_spacing": options.pop("front_spacing", "0.4c"),
+        "front_size": options.pop("front_size", "0.16c"),
+        "text_offset": options.pop("text_offset", "1.5c"),
+    }
     if not context.legend_items:
         context.warnings.append(f"[{operation.section}] skipped empty automatic legend")
         return
@@ -274,7 +326,9 @@ def render_legend(context: "RenderContext", operation: "FigureOperation") -> Non
         with descriptor:
             separator = f"\nG {row_gap}\n" if row_gap else "\n"
             descriptor.write(
-                separator.join(str(item["spec"]) for item in context.legend_items)
+                separator.join(
+                    _legend_item_spec(item, geometry) for item in context.legend_items
+                )
             )
             descriptor.write("\n")
         if font:

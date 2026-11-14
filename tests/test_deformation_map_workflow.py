@@ -21,7 +21,6 @@ class DeformationMapWorkflowTests(unittest.TestCase):
         expected = (
             REPOSITORY_ROOT
             / "config_examples"
-            / "visualization"
             / "deformation_map"
             / "deformation_map.cfg"
         )

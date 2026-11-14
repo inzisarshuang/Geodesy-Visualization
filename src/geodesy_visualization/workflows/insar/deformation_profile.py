@@ -68,7 +68,7 @@ from geodesy_visualization.resources import resource_path
 
 cpt_path = resource_path("cpt")
 DEFAULT_CONFIG = resource_path(
-    "config_examples", "visualization", "deformation_profile", "deformation_profile.cfg"
+    "config_examples", "deformation_profile", "deformation_profile.cfg"
 )
 
 

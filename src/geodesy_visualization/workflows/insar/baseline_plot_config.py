@@ -1,5 +1,5 @@
 """
-geodesy_visualization.workflows.insar.baseline_config
+geodesy_visualization.workflows.insar.baseline_plot_config
 ====================================================
 
 功能概述:
@@ -28,6 +28,8 @@ from geodesy_visualization.project_layout import VisualizationProjectLayout
 
 
 _CASE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
+_COLOR = re.compile(r"#[0-9A-Fa-f]{6}\Z")
+_DATE_FORMAT = re.compile(r"(?:%[Ymd]|[ ./-])+\Z")
 _KEYS = {
     "project",
     "processing_root",
@@ -38,15 +40,57 @@ _KEYS = {
     "figsize",
     "y_top_extra",
     "y_bottom_extra",
-    "font_family",
+    "python_font_dir",
+    "matlab_font_family",
+    "matlab_output",
+    "title_label_font_size",
+    "tick_font_size",
+    "legend_font_size",
+    "font_weight",
+    "xlabel",
+    "ylabel",
+    "date_format",
+    "date_tick_unit",
+    "date_tick_interval",
+    "date_tick_rotation",
+    "y_tick_interval",
+    "line_color",
+    "slave_color",
+    "reference_color",
+    "grid_color",
+    "show_grid",
+    "line_label",
+    "slave_label",
+    "reference_label",
 }
 _DEFAULTS = {
-    "title": "Perpendicular Baselines History",
+    "title": "Baselines Distribution",
     "dpi": "300",
     "figsize": "10.5, 6.2",
     "y_top_extra": "50",
     "y_bottom_extra": "0",
-    "font_family": "TeX Gyre Heros",
+    "python_font_dir": "",
+    "matlab_font_family": "FreeSans",
+    "matlab_output": "",
+    "title_label_font_size": "18",
+    "tick_font_size": "16",
+    "legend_font_size": "14",
+    "font_weight": "bold",
+    "xlabel": "SLC Images Acquire Date",
+    "ylabel": "Perpendicular Baselines (m)",
+    "date_format": "%Y-%m",
+    "date_tick_unit": "month",
+    "date_tick_interval": "1",
+    "date_tick_rotation": "45",
+    "y_tick_interval": "100",
+    "line_color": "#333333",
+    "slave_color": "#0000FF",
+    "reference_color": "#FF0000",
+    "grid_color": "#D9D9D9",
+    "show_grid": "true",
+    "line_label": "perpendicular baselines",
+    "slave_label": "slave SLC images",
+    "reference_label": "reference SLC image",
 }
 
 
@@ -63,7 +107,28 @@ class BaselinePlotCase:
     figsize: tuple[float, float]
     y_top_extra: float
     y_bottom_extra: float
-    font_family: str
+    python_font_dir: Path | None
+    matlab_font_family: str
+    matlab_output: Path | None
+    title_label_font_size: float
+    tick_font_size: float
+    legend_font_size: float
+    font_weight: str
+    xlabel: str
+    ylabel: str
+    date_format: str
+    date_tick_unit: str
+    date_tick_interval: int
+    date_tick_rotation: float
+    y_tick_interval: float
+    line_color: str
+    slave_color: str
+    reference_color: str
+    grid_color: str
+    show_grid: bool
+    line_label: str
+    slave_label: str
+    reference_label: str
 
 
 def _within(path: Path, root: Path, label: str) -> Path:
@@ -106,6 +171,77 @@ def _nonnegative_float(value: str, key: str, source: Path) -> float:
         raise ValueError(f"{source}: {key} must be a non-negative number") from error
     if not math.isfinite(parsed) or parsed < 0:
         raise ValueError(f"{source}: {key} must be a non-negative number")
+    return parsed
+
+
+def _positive_float(value: str, key: str, source: Path) -> float:
+    """Parse a finite, positive floating-point configuration value."""
+
+    try:
+        parsed = float(value)
+    except ValueError as error:
+        raise ValueError(f"{source}: {key} must be a positive number") from error
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise ValueError(f"{source}: {key} must be a positive number")
+    return parsed
+
+
+def _rotation(value: str, source: Path) -> float:
+    """Parse a finite date-label rotation within one full turn."""
+
+    try:
+        parsed = float(value)
+    except ValueError as error:
+        raise ValueError(
+            f"{source}: date_tick_rotation must be between -360 and 360"
+        ) from error
+    if not math.isfinite(parsed) or not -360 <= parsed <= 360:
+        raise ValueError(
+            f"{source}: date_tick_rotation must be between -360 and 360"
+        )
+    return parsed
+
+
+def _choice(
+    value: str, key: str, choices: set[str], source: Path
+) -> str:
+    """Normalize a case-insensitive value from one closed vocabulary."""
+
+    parsed = value.strip().lower()
+    if parsed not in choices:
+        allowed = ", ".join(sorted(choices))
+        raise ValueError(f"{source}: {key} must be one of: {allowed}")
+    return parsed
+
+
+def _boolean(value: str, key: str, source: Path) -> bool:
+    """Parse the Boolean spellings shared with the MATLAB CFG reader."""
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{source}: {key} must be a Boolean value")
+
+
+def _color(value: str, key: str, source: Path) -> str:
+    """Parse one shared hexadecimal RGB color."""
+
+    parsed = value.strip()
+    if not _COLOR.fullmatch(parsed):
+        raise ValueError(f"{source}: {key} must use #RRGGBB")
+    return parsed.upper()
+
+
+def _date_display_format(value: str, source: Path) -> str:
+    """Validate the small strftime subset shared by Python and MATLAB."""
+
+    parsed = value.strip()
+    if not parsed or not _DATE_FORMAT.fullmatch(parsed) or "%" not in parsed:
+        raise ValueError(
+            f"{source}: date_format supports %Y, %m, %d and space, -, /, . separators"
+        )
     return parsed
 
 
@@ -197,7 +333,37 @@ def load_baseline_plot_config(path: Path) -> tuple[BaselinePlotCase, ...]:
             layout = VisualizationProjectLayout.bind(
                 root, values["project"], values["processing_root"]
             )
-            output = layout.publication("baseline") / "baseline_network.png"
+            output = layout.publication("baseline_plot") / "baseline_plot.png"
+        matlab_output: Path | None = None
+        if values.get("matlab_output"):
+            matlab_value = Path(values["matlab_output"]).expanduser()
+            matlab_output = _within(
+                matlab_value if matlab_value.is_absolute() else root / matlab_value,
+                root,
+                "MATLAB plot output",
+            )
+        python_font_dir: Path | None = None
+        if values.get("python_font_dir"):
+            font_dir_value = Path(values["python_font_dir"]).expanduser()
+            python_font_dir = (
+                font_dir_value
+                if font_dir_value.is_absolute()
+                else source.parent / font_dir_value
+            ).resolve()
+            if not python_font_dir.is_dir():
+                raise ValueError(
+                    f"{source}: python_font_dir is not a directory: "
+                    f"{python_font_dir}"
+                )
+            if not any(
+                font_file
+                for pattern in ("*.ttf", "*.otf")
+                for font_file in python_font_dir.rglob(pattern)
+            ):
+                raise ValueError(
+                    f"{source}: python_font_dir contains no TTF or OTF fonts: "
+                    f"{python_font_dir}"
+                )
         cases.append(
             BaselinePlotCase(
                 name=name,
@@ -213,7 +379,55 @@ def load_baseline_plot_config(path: Path) -> tuple[BaselinePlotCase, ...]:
                 y_bottom_extra=_nonnegative_float(
                     values["y_bottom_extra"], "y_bottom_extra", source
                 ),
-                font_family=values["font_family"] or _DEFAULTS["font_family"],
+                python_font_dir=python_font_dir,
+                matlab_font_family=(
+                    values["matlab_font_family"]
+                    or _DEFAULTS["matlab_font_family"]
+                ),
+                matlab_output=matlab_output,
+                title_label_font_size=_positive_float(
+                    values["title_label_font_size"], "title_label_font_size", source
+                ),
+                tick_font_size=_positive_float(
+                    values["tick_font_size"], "tick_font_size", source
+                ),
+                legend_font_size=_positive_float(
+                    values["legend_font_size"], "legend_font_size", source
+                ),
+                font_weight=_choice(
+                    values["font_weight"],
+                    "font_weight",
+                    {"normal", "bold"},
+                    source,
+                ),
+                xlabel=values["xlabel"] or _DEFAULTS["xlabel"],
+                ylabel=values["ylabel"] or _DEFAULTS["ylabel"],
+                date_format=_date_display_format(values["date_format"], source),
+                date_tick_unit=_choice(
+                    values["date_tick_unit"],
+                    "date_tick_unit",
+                    {"day", "month", "year"},
+                    source,
+                ),
+                date_tick_interval=_positive_integer(
+                    values["date_tick_interval"], "date_tick_interval", source
+                ),
+                date_tick_rotation=_rotation(values["date_tick_rotation"], source),
+                y_tick_interval=_positive_float(
+                    values["y_tick_interval"], "y_tick_interval", source
+                ),
+                line_color=_color(values["line_color"], "line_color", source),
+                slave_color=_color(values["slave_color"], "slave_color", source),
+                reference_color=_color(
+                    values["reference_color"], "reference_color", source
+                ),
+                grid_color=_color(values["grid_color"], "grid_color", source),
+                show_grid=_boolean(values["show_grid"], "show_grid", source),
+                line_label=values["line_label"] or _DEFAULTS["line_label"],
+                slave_label=values["slave_label"] or _DEFAULTS["slave_label"],
+                reference_label=(
+                    values["reference_label"] or _DEFAULTS["reference_label"]
+                ),
             )
         )
     if not cases:

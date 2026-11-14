@@ -122,10 +122,13 @@ def render_scalebar(context: "RenderContext", operation: "FigureOperation") -> N
     font_options = {}
     font_annot = options.pop("font_annot_primary", None)
     font_label = options.pop("font_label", None)
+    map_scale_height = options.pop("map_scale_height", None)
     if font_annot:
         font_options["FONT_ANNOT_PRIMARY"] = str(font_annot)
     if font_label:
         font_options["FONT_LABEL"] = str(font_label)
+    if map_scale_height:
+        font_options["MAP_SCALE_HEIGHT"] = str(map_scale_height)
     method = getattr(context.figure, "scalebar", None)
     if callable(method):
         if font_options:

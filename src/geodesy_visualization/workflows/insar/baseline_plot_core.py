@@ -1,5 +1,5 @@
 """
-geodesy_visualization.workflows.insar.baseline_network
+geodesy_visualization.workflows.insar.baseline_plot_core
 =====================================================
 
 功能概述:
@@ -18,7 +18,7 @@ geodesy_visualization.workflows.insar.baseline_network
         读取并校验 Analysis schema-1/schema-2 基线清单。
     ``read_baseline_network``:
         读取四列基线网络并求解各日期相对垂直基线。
-    ``plot_baseline_network``:
+    ``render_baseline_plot``:
         将已验证的时间—垂直基线网络原子发布为 PNG 图件。
 """
 
@@ -29,11 +29,16 @@ import math
 from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from geodesy_visualization.io import atomic_output_path
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
 
 @dataclass(frozen=True)
@@ -261,18 +266,82 @@ def read_baseline_network(manifest: BaselineManifest) -> BaselineNetwork:
     )
 
 
-def plot_baseline_network(
+def _calendar_tick_dates(
+    lower: datetime, upper: datetime, unit: str, interval: int
+) -> tuple[datetime, ...]:
+    """Return globally anchored calendar ticks shared with the MATLAB backend."""
+
+    if interval < 1:
+        raise ValueError("date tick interval must be positive")
+    if unit == "month":
+        serial = lower.year * 12 + lower.month - 1
+        first_serial = ((serial + interval - 1) // interval) * interval
+        year, month_index = divmod(first_serial, 12)
+        current = datetime(year, month_index + 1, 1)
+        if current < lower:
+            first_serial += interval
+            year, month_index = divmod(first_serial, 12)
+            current = datetime(year, month_index + 1, 1)
+        values: list[datetime] = []
+        while current <= upper:
+            values.append(current)
+            first_serial += interval
+            year, month_index = divmod(first_serial, 12)
+            current = datetime(year, month_index + 1, 1)
+        return tuple(values)
+    if unit == "year":
+        year = ((lower.year + interval - 1) // interval) * interval
+        current = datetime(year, 1, 1)
+        if current < lower:
+            current = datetime(year + interval, 1, 1)
+        values = []
+        while current <= upper:
+            values.append(current)
+            current = datetime(current.year + interval, 1, 1)
+        return tuple(values)
+    if unit == "day":
+        anchor = datetime(1970, 1, 1)
+        elapsed_days = (lower - anchor).total_seconds() / 86400.0
+        step = math.ceil(elapsed_days / interval) * interval
+        current = anchor + timedelta(days=step)
+        values = []
+        while current <= upper:
+            values.append(current)
+            current += timedelta(days=interval)
+        return tuple(values)
+    raise ValueError("date tick unit must be day, month, or year")
+
+
+def _build_baseline_plot(
     network: BaselineNetwork,
-    output: Path,
     *,
     title: str,
-    dpi: int,
     figsize: tuple[float, float],
     y_top_extra: float,
     y_bottom_extra: float,
-    font_family: str,
-) -> Path:
-    """Draw one validated temporal–perpendicular network and publish it atomically."""
+    title_label_font_size: float,
+    tick_font_size: float,
+    legend_font_size: float,
+    font_weight: str,
+    xlabel: str,
+    ylabel: str,
+    date_format: str,
+    date_tick_unit: str,
+    date_tick_interval: int,
+    date_tick_rotation: float,
+    y_tick_interval: float,
+    line_color: str,
+    slave_color: str,
+    reference_color: str,
+    grid_color: str,
+    show_grid: bool,
+    line_label: str,
+    slave_label: str,
+    reference_label: str,
+    font_dir: Path | None = None,
+    font_family: str | None = None,
+) -> tuple[Figure, Axes]:
+    """Build one validated baseline figure without publishing it."""
 
     if not isinstance(network, BaselineNetwork):
         raise TypeError("network must be BaselineNetwork")
@@ -282,10 +351,11 @@ def plot_baseline_network(
     import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
+    from matplotlib.ticker import FixedLocator, MultipleLocator
 
     from geodesy_visualization.backends.matplotlib import configure_plot_font
 
-    configure_plot_font(font_family)
+    selected_font = configure_plot_font(font_family, strict=True, font_dir=font_dir)
     date_to_x = {
         date: mdates.date2num(datetime.strptime(date, "%Y%m%d"))
         for date in network.dates
@@ -299,63 +369,131 @@ def plot_baseline_network(
         for pair in network.pairs
     ]
     figure, axis = plt.subplots(figsize=figsize, constrained_layout=True)
+    figure.patch.set_facecolor("white")
+    axis.set_facecolor("white")
+    axis.add_collection(
+        LineCollection(
+            segments,
+            colors=line_color,
+            linewidths=2.0,
+            zorder=1,
+            label=line_label,
+        )
+    )
+    reference = network.manifest.reference_date
+    normal = [date for date in network.dates if date != reference]
+    axis.scatter(
+        [date_to_x[date] for date in normal],
+        [date_to_y[date] for date in normal],
+        s=100,
+        facecolor=slave_color,
+        edgecolor=slave_color,
+        linewidth=1.5,
+        zorder=3,
+        label=slave_label,
+    )
+    axis.scatter(
+        [date_to_x[reference]],
+        [date_to_y[reference]],
+        s=100,
+        facecolor=reference_color,
+        edgecolor=reference_color,
+        linewidth=1.5,
+        zorder=4,
+        label=reference_label,
+    )
+    axis.set_title(
+        title,
+        fontsize=title_label_font_size,
+        fontweight=font_weight,
+        pad=12,
+    )
+    axis.set_xlabel(
+        xlabel, fontsize=title_label_font_size, fontweight=font_weight
+    )
+    axis.set_ylabel(
+        ylabel, fontsize=title_label_font_size, fontweight=font_weight
+    )
+    axis.set_axisbelow(True)
+    axis.grid(
+        show_grid,
+        which="major",
+        color=grid_color,
+        linewidth=1.0,
+        zorder=0,
+    )
+    axis.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
+    axis.yaxis.set_major_locator(MultipleLocator(y_tick_interval))
+    axis.tick_params(
+        axis="both",
+        which="major",
+        labelsize=tick_font_size,
+        width=2.0,
+        length=6.0,
+        top=True,
+        right=True,
+        direction="in",
+    )
+    plt.setp(
+        axis.get_xticklabels(),
+        rotation=date_tick_rotation,
+        ha="right" if date_tick_rotation else "center",
+        fontweight=font_weight,
+    )
+    plt.setp(axis.get_yticklabels(), fontweight=font_weight)
+    for spine in axis.spines.values():
+        spine.set_linewidth(2.0)
+    xs = tuple(date_to_x.values())
+    ys = tuple(date_to_y.values())
+    y_span = max(ys) - min(ys)
+    y_pad = max(40.0, y_span * 0.12)
+    x_lower = min(xs) - 30.0
+    x_upper = max(xs) + 30.0
+    axis.set_xlim(x_lower, x_upper)
+    tick_dates = _calendar_tick_dates(
+        mdates.num2date(x_lower).replace(tzinfo=None),
+        mdates.num2date(x_upper).replace(tzinfo=None),
+        date_tick_unit,
+        date_tick_interval,
+    )
+    axis.xaxis.set_major_locator(
+        FixedLocator([mdates.date2num(value) for value in tick_dates])
+    )
+    axis.set_ylim(
+        min(ys) - y_pad - y_bottom_extra,
+        max(ys) + y_pad + y_top_extra,
+    )
+    legend = axis.legend(
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1.0),
+        borderaxespad=0.0,
+        frameon=True,
+        framealpha=1.0,
+        fontsize=legend_font_size,
+        prop={
+            "family": selected_font,
+            "size": legend_font_size,
+            "weight": font_weight,
+        },
+    )
+    legend.get_frame().set_edgecolor("black")
+    legend.get_frame().set_linewidth(1.5)
+    return figure, axis
+
+
+def render_baseline_plot(
+    network: BaselineNetwork,
+    output: Path,
+    *,
+    dpi: int,
+    **validated_style: object,
+) -> Path:
+    """Draw one validated temporal–perpendicular network and publish it atomically."""
+
+    import matplotlib.pyplot as plt
+
+    figure, _ = _build_baseline_plot(network, **validated_style)
     try:
-        figure.patch.set_facecolor("white")
-        axis.set_facecolor("#f7f8fa")
-        axis.add_collection(
-            LineCollection(
-                segments,
-                colors="#4b5563",
-                linewidths=1.75,
-                alpha=0.78,
-                zorder=1,
-            )
-        )
-        reference = network.manifest.reference_date
-        normal = [date for date in network.dates if date != reference]
-        axis.scatter(
-            [date_to_x[date] for date in normal],
-            [date_to_y[date] for date in normal],
-            s=62,
-            facecolor="#2f80ed",
-            edgecolor="#1f2937",
-            linewidth=0.8,
-            zorder=3,
-            label="SLC images",
-        )
-        axis.scatter(
-            [date_to_x[reference]],
-            [date_to_y[reference]],
-            s=86,
-            facecolor="#ef4444",
-            edgecolor="#111827",
-            linewidth=1.1,
-            zorder=4,
-            label=f"master SLC ({reference})",
-        )
-        axis.set_title(title, fontsize=15, fontweight="bold", pad=12)
-        axis.set_xlabel("SLC Acquisition Date", fontsize=12, fontweight="bold")
-        axis.set_ylabel("Perpendicular Baseline (m)", fontsize=12, fontweight="bold")
-        axis.set_axisbelow(True)
-        axis.grid(True, which="major", color="white", linewidth=1.2, zorder=0)
-        axis.grid(
-            True, which="minor", color="white", linewidth=0.5, alpha=0.65, zorder=0
-        )
-        axis.tick_params(axis="both", labelsize=10)
-        axis.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=8))
-        axis.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-        plt.setp(axis.get_xticklabels(), rotation=25, ha="right")
-        xs = tuple(date_to_x.values())
-        ys = tuple(date_to_y.values())
-        y_span = max(ys) - min(ys)
-        y_pad = max(40.0, y_span * 0.12)
-        axis.set_xlim(min(xs) - 30.0, max(xs) + 30.0)
-        axis.set_ylim(
-            min(ys) - y_pad - y_bottom_extra,
-            max(ys) + y_pad + y_top_extra,
-        )
-        legend = axis.legend(loc="upper left", frameon=True, framealpha=0.96)
-        legend.get_frame().set_edgecolor("#d1d5db")
         destination = Path(output).expanduser().resolve()
         with atomic_output_path(destination) as temporary:
             figure.savefig(temporary, dpi=dpi, facecolor="white")
@@ -368,7 +506,7 @@ __all__ = [
     "BaselineManifest",
     "BaselineNetwork",
     "BaselinePair",
-    "plot_baseline_network",
+    "render_baseline_plot",
     "read_baseline_manifest",
     "read_baseline_network",
 ]

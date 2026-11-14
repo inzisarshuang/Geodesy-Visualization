@@ -11,10 +11,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from geodesy_visualization.workflows.insar.baseline_cli import main
-from geodesy_visualization.workflows.insar.baseline_config import (
+from geodesy_visualization.workflows.insar.baseline_plot import main
+from geodesy_visualization.workflows.insar.baseline_plot_config import (
     load_baseline_plot_config,
     select_baseline_plot_case,
+)
+from geodesy_visualization.workflows.insar.baseline_plot_core import (
+    read_baseline_manifest,
+    read_baseline_network,
 )
 
 
@@ -46,12 +50,32 @@ dpi = 180
 figsize = 12, 6
 y_top_extra = 60
 y_bottom_extra = 5
-font_family = DejaVu Sans
+matlab_font_family = Helvetica
+title_label_font_size = 20
+tick_font_size = 15
+legend_font_size = 13
+font_weight = normal
+xlabel = Acquisition month
+ylabel = Bperp (m)
+date_format = %Y/%m
+date_tick_unit = year
+date_tick_interval = 2
+date_tick_rotation = -15
+y_tick_interval = 125
+line_color = #112233
+slave_color = #2244AA
+reference_color = #CC2200
+grid_color = #DDDDDD
+show_grid = no
+line_label = Selected pairs
+slave_label = Secondary acquisitions
+reference_label = Reference acquisition
 title = Default title
 
 [case:ascending]
 baseline_manifest = ANALYSIS/GAMMA/ascending/BASELINE/baseline_manifest.json
 output = VISUALIZATION/ascending/baseline.png
+matlab_output = VISUALIZATION/ascending/baseline_matlab.png
 title = Ascending network
 
 [case:second]
@@ -76,10 +100,67 @@ figsize = 9 5
         self.assertEqual(first.figsize, (12.0, 6.0))
         self.assertEqual(first.y_top_extra, 60.0)
         self.assertEqual(first.y_bottom_extra, 5.0)
-        self.assertEqual(first.font_family, "DejaVu Sans")
+        self.assertEqual(first.matlab_font_family, "Helvetica")
+        self.assertEqual(first.title_label_font_size, 20.0)
+        self.assertEqual(first.tick_font_size, 15.0)
+        self.assertEqual(first.legend_font_size, 13.0)
+        self.assertEqual(first.font_weight, "normal")
+        self.assertEqual(first.xlabel, "Acquisition month")
+        self.assertEqual(first.ylabel, "Bperp (m)")
+        self.assertEqual(first.date_format, "%Y/%m")
+        self.assertEqual(first.date_tick_unit, "year")
+        self.assertEqual(first.date_tick_interval, 2)
+        self.assertEqual(first.date_tick_rotation, -15.0)
+        self.assertEqual(first.y_tick_interval, 125.0)
+        self.assertEqual(first.line_color, "#112233")
+        self.assertEqual(first.slave_color, "#2244AA")
+        self.assertEqual(first.reference_color, "#CC2200")
+        self.assertEqual(first.grid_color, "#DDDDDD")
+        self.assertFalse(first.show_grid)
+        self.assertEqual(first.line_label, "Selected pairs")
+        self.assertEqual(first.slave_label, "Secondary acquisitions")
+        self.assertEqual(first.reference_label, "Reference acquisition")
+        self.assertEqual(
+            first.matlab_output,
+            (root / "VISUALIZATION/ascending/baseline_matlab.png").resolve(),
+        )
         self.assertEqual(second.dpi, 240)
         self.assertEqual(second.figsize, (9.0, 5.0))
+        self.assertIsNone(second.matlab_output)
         self.assertEqual(select_baseline_plot_case(cases, "second"), second)
+
+    def test_legacy_python_only_case_uses_publication_defaults(self) -> None:
+        """Keep existing CFG files valid while adopting the MATLAB reference style."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            _, _, config = self._project(directory)
+            config.write_text(
+                """[project]
+root = ../..
+[case:main]
+baseline_manifest = ANALYSIS/GAMMA/ascending/BASELINE/baseline_manifest.json
+output = VISUALIZATION/baseline.png
+""",
+                encoding="utf-8",
+            )
+            (case,) = load_baseline_plot_config(config)
+
+        self.assertIsNone(case.matlab_output)
+        self.assertIsNone(case.python_font_dir)
+        self.assertEqual(case.matlab_font_family, "FreeSans")
+        self.assertEqual(case.title, "Baselines Distribution")
+        self.assertEqual(case.xlabel, "SLC Images Acquire Date")
+        self.assertEqual(case.ylabel, "Perpendicular Baselines (m)")
+        self.assertEqual(case.title_label_font_size, 18.0)
+        self.assertEqual(case.tick_font_size, 16.0)
+        self.assertEqual(case.legend_font_size, 14.0)
+        self.assertEqual(case.font_weight, "bold")
+        self.assertEqual(case.date_format, "%Y-%m")
+        self.assertEqual(case.date_tick_unit, "month")
+        self.assertEqual(case.date_tick_interval, 1)
+        self.assertEqual(case.date_tick_rotation, 45.0)
+        self.assertEqual(case.y_tick_interval, 100.0)
+        self.assertTrue(case.show_grid)
 
     def test_single_case_does_not_require_name_but_multiple_cases_do(self) -> None:
         """Catch silently selecting an arbitrary case from a multi-case cfg."""
@@ -126,7 +207,7 @@ output = VISUALIZATION/baseline.png
             self.assertEqual(
                 case.output,
                 root
-                / "S1/ASCENDING_128/GAMMA/FIGURES/PUBLICATION/BASELINE/baseline_network.png",
+                / "S1/ASCENDING_128/GAMMA/FIGURES/PUBLICATION/BASELINE_PLOT/baseline_plot.png",
             )
 
     def test_rejects_structural_and_required_value_errors(self) -> None:
@@ -180,6 +261,26 @@ output = VISUALIZATION/baseline.png
             ("figsize = 10, 0", "figsize"),
             ("y_top_extra = -1", "y_top_extra"),
             ("y_bottom_extra = -1", "y_bottom_extra"),
+            ("python_font_dir = .", "TTF or OTF"),
+            ("title_label_font_size = 0", "title_label_font_size"),
+            ("tick_font_size = nan", "tick_font_size"),
+            ("legend_font_size = -1", "legend_font_size"),
+            ("font_weight = heavy", "font_weight"),
+            ("font_family = FreeSans", "unknown"),
+            ("python_font_family = FreeSans", "unknown"),
+            ("date_tick_unit = quarter", "date_tick_unit"),
+            ("date_tick_interval = 0", "date_tick_interval"),
+            ("date_tick_rotation = inf", "date_tick_rotation"),
+            ("y_tick_interval = 0", "y_tick_interval"),
+            ("line_color = red", "line_color"),
+            ("slave_color = #12345", "slave_color"),
+            ("reference_color = #GG0000", "reference_color"),
+            ("grid_color = 112233", "grid_color"),
+            ("show_grid = perhaps", "show_grid"),
+            ("date_format = %Y-%q", "date_format"),
+            ("date_format = %Y_%m", "date_format"),
+            ("matlab_output = /tmp/outside-matlab.png", "project"),
+            ("unknown_style = value", "unknown"),
             ("output = /tmp/outside-baseline.png", "project"),
         )
         for override, message in cases:
@@ -258,7 +359,6 @@ output = VISUALIZATION/ascending/baseline.png
 title = Test baseline network
 dpi = 90
 figsize = 6, 4
-font_family = TeX Gyre Heros
 """
             + extra,
             encoding="utf-8",
@@ -303,17 +403,19 @@ font_family = TeX Gyre Heros
         repository = Path(__file__).resolve().parents[1]
         project = (repository / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn(
-            'geodesy-visualization-insar-baseline = "geodesy_visualization.workflows.insar.baseline_cli:main"',
+            'geodesy-visualization = "geodesy_visualization.cli:main"',
             project,
         )
+        self.assertNotIn("geodesy-visualization-insar-baseline", project)
         self.assertIn(
-            '"share/geodesy-visualization/config_examples/visualization" = '
-            '["config_examples/visualization/*.cfg"]',
+            '"share/geodesy-visualization/config_examples/baseline_plot" = '
+            '["config_examples/baseline_plot/*.cfg"]',
             project,
         )
-        examples = repository / "config_examples/visualization/baseline_plot.cfg"
+        examples = repository / "config_examples/baseline_plot/baseline_plot.cfg"
         self.assertTrue(examples.is_file())
         self.assertGreater(examples.stat().st_size, 0)
+        self.assertFalse((repository / "config_examples/visualization").exists())
 
 
 class BaselinePlotDependencyTests(unittest.TestCase):
@@ -324,7 +426,7 @@ class BaselinePlotDependencyTests(unittest.TestCase):
 
         script = (
             "import sys; "
-            "import geodesy_visualization.workflows.insar.baseline_config; "
+            "import geodesy_visualization.workflows.insar.baseline_plot_config; "
             "assert 'matplotlib' not in sys.modules"
         )
         completed = subprocess.run(
@@ -335,6 +437,41 @@ class BaselinePlotDependencyTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
+
+
+class BaselineExampleTests(unittest.TestCase):
+    """Keep the packaged LT-1 reference scientifically exact and runnable."""
+
+    def test_lt1_example_preserves_the_historical_three_pair_network(self) -> None:
+        """Catch a demo that drifts away from the accepted MATLAB source values."""
+
+        repository = Path(__file__).resolve().parents[1]
+        config = repository / "config_examples/baseline_plot/baseline_plot.cfg"
+        (case,) = load_baseline_plot_config(config)
+        manifest = read_baseline_manifest(
+            case.baseline_manifest, project_root=case.project_root
+        )
+        network = read_baseline_network(manifest)
+
+        self.assertEqual(manifest.reference_date, "20231222")
+        self.assertEqual(manifest.pair_count, 3)
+        self.assertEqual(
+            [
+                (pair.master, pair.slave, pair.perpendicular_baseline_m)
+                for pair in network.pairs
+            ],
+            [
+                ("20231222", "20230629", -603.5297),
+                ("20231222", "20230731", -808.2997),
+                ("20231222", "20231218", -742.2232),
+            ],
+        )
+        self.assertEqual(
+            case.python_font_dir,
+            (repository / "fonts/TeXGyreHeros").resolve(),
+        )
+        self.assertEqual(case.matlab_font_family, "FreeSans")
+        self.assertIsNotNone(case.matlab_output)
 
 
 if __name__ == "__main__":

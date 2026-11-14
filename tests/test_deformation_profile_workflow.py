@@ -21,7 +21,6 @@ class DeformationProfileWorkflowTests(unittest.TestCase):
         expected = (
             REPOSITORY_ROOT
             / "config_examples"
-            / "visualization"
             / "deformation_profile"
             / "deformation_profile.cfg"
         )

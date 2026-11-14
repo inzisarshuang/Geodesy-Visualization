@@ -12,7 +12,7 @@ This document explains the repository architecture behind the short rules in `AG
 - `src/geodesy_visualization/backends/pygmt.py`: PyGMT figure state, map composition, profile drawing, legends, annotations, and final figure output.
 - `src/geodesy_visualization/workflows/`: canonical cfg normalization and figure orchestration, organized by scientific domain where the workflow is domain-specific.
 - `lib/pygmt_visual.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
-- `config_examples/visualization/<workflow>/`: stable cfg/data examples for each workflow.
+- `config_examples/<workflow>/`: stable cfg/data examples for each workflow.
 - `tests/`: fast regression checks using temporary data.
 
 Do not copy conversion branches or configuration parsers into an entry script. Extend the owning shared module when two workflows need the same behavior. New package-owned code belongs under `src/geodesy_visualization/`; legacy `lib/` paths remain only until their callers have compatibility coverage.

@@ -196,7 +196,7 @@ git commit -m "feat: add study-area cartography operations"
 - Create: `src/geodesy_visualization/workflows/cartography/study_area.py`
 - Modify: `src/geodesy_visualization/cli.py`
 - Create: `tests/test_study_area_workflow.py`
-- Create: `config_examples/visualization/study_area/study_area.cfg`
+- Create: `config_examples/visualization/study_area/footprint.cfg`
 - Create: `config_examples/visualization/study_area/data/reference_footprint.kml`
 - Create: `config_examples/visualization/study_area/data/slave_footprints.kml`
 - Create: `config_examples/visualization/study_area/data/faults.geojson`

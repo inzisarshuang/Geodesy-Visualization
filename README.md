@@ -46,7 +46,9 @@ Geodesy-Visualization/
 │   ├── workflows/cartography/
 │   │   └── study_area.py              # study-area and footprint workflow / 研究区与 footprint 流程
 │   ├── workflows/insar/
-│   │   ├── baseline_network.py        # baseline-network figure / 基线网络图
+│   │   ├── baseline_plot.py           # baseline_plot workflow / 基线绘图流程
+│   │   ├── baseline_plot_config.py    # baseline_plot CFG / 基线绘图配置
+│   │   ├── baseline_plot_core.py      # baseline_plot data/rendering / 数据与渲染
 │   │   ├── deformation_map.py        # canonical deformation-map workflow / 正式形变地图流程
 │   │   ├── deformation_profile.py    # canonical deformation-profile workflow / 正式形变剖面流程
 │   │   ├── timeseries_aux.py         # canonical auxiliary-series workflow / 正式辅助时序流程
@@ -59,11 +61,11 @@ Geodesy-Visualization/
 │   ├── pygmt_io.py                   # compatibility import / 兼容导入
 │   ├── pygmt_geo.py                  # spatial processing / 空间处理
 │   └── pygmt_visual.py               # compatibility import / 兼容导入
-├── config_examples/visualization/deformation_map/         # cfg + data example / 配置与数据示例
-├── config_examples/visualization/study_area/              # study-area cfg + fixtures / 研究区配置与数据
-├── config_examples/visualization/deformation_profile/    # cfg + data example / 配置与数据示例
-├── config_examples/visualization/timeseries_map/         # cfg + data example / 配置与数据示例
-├── config_examples/visualization/timeseries_aux/        # cfg + data example / 配置与数据示例
+├── config_examples/deformation_map/         # cfg + data example / 配置与数据示例
+├── config_examples/study_area/              # study-area cfg + fixtures / 研究区配置与数据
+├── config_examples/deformation_profile/    # cfg + data example / 配置与数据示例
+├── config_examples/timeseries_map/         # cfg + data example / 配置与数据示例
+├── config_examples/timeseries_aux/        # cfg + data example / 配置与数据示例
 ├── tests/                            # regression tests / 回归测试
 └── requirements.txt                  # Python dependencies / Python 依赖
 ```
@@ -78,7 +80,7 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - Development entry points: [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).<br>开发入口：上述两个文件。
 - Engineering baseline: [docs/development/README.md](docs/development/README.md).<br>工程规范入口：上述链接。
 - Scientific conventions: [docs/development/scientific_conventions.md](docs/development/scientific_conventions.md).<br>科学数据约定：上述链接。
-- Workflow parameters: [study_area.cfg](config_examples/visualization/study_area/study_area.cfg), [deformation_map.cfg](config_examples/visualization/deformation_map/deformation_map.cfg), and [deformation_profile.cfg](config_examples/visualization/deformation_profile/deformation_profile.cfg).<br>流程参数说明：上述示例 cfg。
+- Workflow parameters: [footprint.cfg](config_examples/study_area/footprint.cfg), [deformation_map.cfg](config_examples/deformation_map/deformation_map.cfg), and [deformation_profile.cfg](config_examples/deformation_profile/deformation_profile.cfg).<br>流程参数说明：上述示例 cfg。
 
 ## 3. Workflow Overview / 流程总览
 
@@ -110,12 +112,17 @@ location insets and supporting elements in a compact publication composition.
 PyGMT-native parameter names such as `region`, `projection`, `grid`, `cmap`,
 `data`, `pen`, `fill`, `position`, and `transparency` are preserved. The
 workflow adds only bounded project/scientific keys such as `enabled`, `source`,
-`layout`, and `kinematic_field`. Unknown sections and keys fail before drawing.
+`layout`, and `kinematic_field`, plus publication controls that have no direct
+PyGMT keyword equivalent: `map_scale_height`, `symbol_offset`, `line_length`,
+`front_spacing`, `front_size`, and `text_offset`. Unknown sections and keys
+fail before drawing.
 
 CFG 尽量直接沿用 `region`、`projection`、`grid`、`cmap`、`data`、`pen`、
 `fill`、`position` 和 `transparency` 等 PyGMT 参数名；工作流只增加
-`enabled`、`source`、`layout` 和 `kinematic_field` 等有限项目/科学字段。
-未知 section 或 key 会在绘图前报错。
+`enabled`、`source`、`layout` 和 `kinematic_field` 等有限项目/科学字段，
+以及 PyGMT 没有直接同名参数的出版控制：`map_scale_height`、
+`symbol_offset`、`line_length`、`front_spacing`、`front_size` 和
+`text_offset`。未知 section 或 key 会在绘图前报错。
 
 ```bash
 geodesy-visualization study-area \
@@ -130,11 +137,11 @@ The deformation-map workflow converts TIF, lon/lat TXT, or Defsour deformation d
 
 The installed `geodesy-visualization` command is the formal workflow
 orchestrator. All runnable examples are kept under
-`config_examples/visualization/<workflow>/`, with each directory containing
+`config_examples/<workflow>/`, with each directory containing
 its cfg and input data.
 
 已安装的 `geodesy-visualization` 命令是正式流程编排入口。所有配置与数据示例
-统一位于 `config_examples/visualization/<workflow>/`。
+统一位于 `config_examples/<workflow>/`。
 
 ```bash
 geodesy-visualization deformation-map --config <project>/config/4visualization/deformation_map.cfg
@@ -142,7 +149,7 @@ geodesy-visualization study-area --config <project>/config/4visualization/study_
 geodesy-visualization deformation-profile --config <project>/config/4visualization/deformation_profile.cfg
 geodesy-visualization timeseries-map --config <project>/config/4visualization/timeseries_map.cfg
 geodesy-visualization timeseries-aux --config <project>/config/4visualization/timeseries_aux.cfg
-geodesy-visualization baseline-network --config <project>/config/4visualization/baseline_plot.cfg --case <name>
+geodesy-visualization baseline_plot --config <project>/config/4visualization/baseline_plot.cfg --case <name>
 ```
 
 1. Read and validate the cfg file, including paths, units, color limits, transparency, and styles.<br>读取并校验 cfg 中的路径、单位、色标范围、透明度和样式。
@@ -161,23 +168,23 @@ The deformation-profile workflow compares two deformation datasets on separate m
 3. Sample both grids along every track and calculate cumulative WGS84 distance.<br>沿每条轨迹采样两套网格并计算 WGS84 累计距离。
 4. Export one map per dataset and optional line or scatter comparison figures per track.<br>为每套数据输出地图，并按剖线选择输出折线或散点对比图。
 
-### 3.4 Baseline Network / 基线网络图
+### 3.4 Baseline Plot / 基线绘图
 
-`geodesy-visualization-insar-baseline` reads a completed
+`geodesy-visualization baseline_plot` reads a completed
 `baseline_manifest.json` from Geodesy-Analysis, validates its referenced
 four-column network, and draws acquisition nodes and selected interferogram
 pairs. It does not invoke GAMMA or modify Analysis products.
 
-`geodesy-visualization-insar-baseline` 读取 Geodesy-Analysis 发布的
+`geodesy-visualization baseline_plot` 读取 Geodesy-Analysis 发布的
 `baseline_manifest.json`，校验其引用的四列基线网络，并绘制
 影像节点与已选干涉对。该流程不调用 GAMMA，也不修改 Analysis
 产品。
 
 ### 3.5 Library Responsibilities / 函数库职责
 
-The time-series workflows provide cfg-driven geographic panels and shared-date-axis deformation/auxiliary figures. Example inputs live under `config_examples/visualization/<workflow>/data`; project publication outputs belong under `<processing_root>/FIGURES/PUBLICATION/<WORKFLOW>/`.
+The time-series workflows provide cfg-driven geographic panels and shared-date-axis deformation/auxiliary figures. Example inputs live under `config_examples/<workflow>/data`; project publication outputs belong under `<processing_root>/FIGURES/PUBLICATION/<WORKFLOW>/`.
 
-时序 workflow 提供 cfg 驱动的地理子图和共享日期轴的形变/辅助时序图。示例输入位于 `config_examples/visualization/<workflow>/data`，正式项目图统一位于 `<processing_root>/FIGURES/PUBLICATION/<WORKFLOW>/`。
+时序 workflow 提供 cfg 驱动的地理子图和共享日期轴的形变/辅助时序图。示例输入位于 `config_examples/<workflow>/data`，正式项目图统一位于 `<processing_root>/FIGURES/PUBLICATION/<WORKFLOW>/`。
 
 - `src/geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
 - `src/geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
@@ -192,11 +199,13 @@ The time-series workflows provide cfg-driven geographic panels and shared-date-a
 - `src/geodesy_visualization/backends/matplotlib.py`: analysis-neutral array panels, target-series figures, InSAR/GNSS comparison composition, and bundled-font registration.<br>正式负责与 Analysis 解耦的数组子图、目标时序图、InSAR/GNSS 对比图组合及内置字体注册。
 - `src/geodesy_visualization/workflows/insar/timeseries_aux.py`: canonical cfg-driven deformation and auxiliary-series workflow.<br>正式的 cfg 驱动形变与辅助时序工作流。
 - `src/geodesy_visualization/workflows/insar/timeseries_map.py`: canonical cfg-driven multi-epoch deformation-map workflow.<br>正式的 cfg 驱动多期形变地图工作流。
-- `src/geodesy_visualization/workflows/insar/baseline_network.py`: validates Analysis baseline products and atomically publishes the Matplotlib network figure.<br>校验 Analysis 基线产品并原子发布 Matplotlib 基线网络图。
+- `src/geodesy_visualization/workflows/insar/baseline_plot.py`: provides the unified `baseline_plot` workflow entry.<br>提供统一的 `baseline_plot` 工作流入口。
+- `src/geodesy_visualization/workflows/insar/baseline_plot_config.py`: validates the shared CFG.<br>校验共享 CFG。
+- `src/geodesy_visualization/workflows/insar/baseline_plot_core.py`: validates Analysis baseline products and atomically publishes the plot.<br>校验 Analysis 基线产品并原子发布图件。
 - `src/geodesy_visualization/workflows/insar/deformation_map.py`: canonical cfg-driven DEM/optical deformation-map orchestration using formal package grid preparation.<br>正式的 cfg 驱动 DEM/光学形变地图编排，直接使用正式 package 临时网格准备接口。
 - `src/geodesy_visualization/workflows/insar/deformation_profile.py`: canonical cfg-driven map, shared-track sampling, and line/scatter profile orchestration.<br>正式的 cfg 驱动地图、公共轨迹采样及折线/散点剖面编排。
 - `lib/pygmt_visual.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有绘图器导入路径提供兼容重导出，不包含独立实现。
-- `config_examples/visualization/<workflow>/`: workflow cfg and input-data examples.<br>各工作流的 cfg 与输入数据示例。
+- `config_examples/<workflow>/`: workflow cfg and input-data examples.<br>各工作流的 cfg 与输入数据示例。
 
 ## 4. Dependencies And Installation / 环境与安装
 
@@ -256,7 +265,7 @@ cfg 中的路径按声明的项目上下文解析，而不是终端当前目录�
 
 ```bash
 conda run -n envPlot geodesy-visualization study-area \
-  --config config_examples/visualization/study_area/study_area.cfg
+  --config config_examples/study_area/footprint.cfg
 ```
 
 Add another image or product by copying a footprint section and changing its
@@ -275,42 +284,42 @@ label = SAOCOM image footprint
 
 ```bash
 conda run -n envPlot geodesy-visualization deformation-map \
-  --config config_examples/visualization/deformation_map/deformation_map.cfg
+  --config config_examples/deformation_map/deformation_map.cfg
 ```
 
 ### 5.3 Deformation Profiles / 形变剖面
 
 ```bash
 conda run -n envPlot geodesy-visualization deformation-profile \
-  --config config_examples/visualization/deformation_profile/deformation_profile.cfg
+  --config config_examples/deformation_profile/deformation_profile.cfg
 ```
 
 ### 5.4 Spatial Time-Series Panels / 空间时序子图
 
 ```bash
 conda run -n envPlot geodesy-visualization timeseries-map \
-  --config config_examples/visualization/timeseries_map/timeseries_map.cfg
+  --config config_examples/timeseries_map/timeseries_map.cfg
 ```
 
 ### 5.5 Deformation And Auxiliary Series / 形变与辅助时序
 
 ```bash
 conda run -n envPlot geodesy-visualization timeseries-aux \
-  --config config_examples/visualization/timeseries_aux/timeseries_aux.cfg
+  --config config_examples/timeseries_aux/timeseries_aux.cfg
 ```
 
-### 5.6 InSAR Baseline Network / InSAR 基线网络图
+### 5.6 InSAR Baseline Plot / InSAR 基线绘图
 
-Copy [the documented example cfg](config_examples/visualization/baseline_plot.cfg) into the
+Copy [the documented example cfg](config_examples/baseline_plot/baseline_plot.cfg) into the
 research project's `config/4visualization/` directory, set its project root,
 manifest and output, then run the installed command from any directory.
 
-将[已完整注释的配置示例](config_examples/visualization/baseline_plot.cfg)复制到研究项目的
+将[已完整注释的配置示例](config_examples/baseline_plot/baseline_plot.cfg)复制到研究项目的
 `config/4visualization/` 目录，设置项目根目录、基线清单与输出路径，
 即可从任意目录执行：
 
 ```bash
-/absolute/envPlot/bin/geodesy-visualization-insar-baseline \
+/absolute/envPlot/bin/geodesy-visualization baseline_plot \
   --config /absolute/PROJECT/config/4visualization/baseline_plot.cfg \
   --case ascending
 ```

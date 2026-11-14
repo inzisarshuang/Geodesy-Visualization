@@ -113,6 +113,48 @@ class FigureOperationConfigTests(unittest.TestCase):
                 str((root / "result/study_area.png").resolve()),
             )
 
+    def test_accepts_scale_and_legend_geometry_controls(self) -> None:
+        """Keep publication symbol geometry explicit and strictly validated in CFG."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = self.write_cfg(
+                Path(tmp),
+                """
+                [figure]
+                layout = publication_sidecar
+
+                [figure.scalebar]
+                position = TR
+                length = 50k
+                map_scale_height = 20p
+
+                [figure.legend]
+                position = BR
+                box = no
+                symbol_offset = 1.8c
+                line_length = 3c
+                front_spacing = 1c
+                front_size = 0.25c
+                text_offset = 4c
+
+                [figure.savefig]
+                fname = result/study_area.png
+                """,
+            )
+
+            plan = load_figure_plan(cfg)
+
+            by_section = {item.section: item for item in plan.operations}
+            self.assertEqual(
+                by_section["figure.scalebar"].options["map_scale_height"], "20p"
+            )
+            legend = by_section["figure.legend"].options
+            self.assertIs(legend["box"], False)
+            self.assertEqual(legend["symbol_offset"], "1.8c")
+            self.assertEqual(legend["line_length"], "3c")
+            self.assertEqual(legend["front_spacing"], "1c")
+            self.assertEqual(legend["front_size"], "0.25c")
+            self.assertEqual(legend["text_offset"], "4c")
+
     def test_rejects_duplicate_sections(self) -> None:
         """Reject an ambiguous chain containing the same operation identifier twice."""
         with tempfile.TemporaryDirectory() as tmp:

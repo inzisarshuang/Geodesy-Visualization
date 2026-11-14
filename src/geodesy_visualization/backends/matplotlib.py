@@ -334,9 +334,56 @@ def _publication_font(preferred: Optional[str] = None) -> str:
     return "DejaVu Sans"
 
 
-def configure_plot_font(preferred: Optional[str] = None) -> str:
-    """注册 Visualization 字体并设置当前 Matplotlib 进程的默认绘图字体。"""
-    selected = _publication_font(preferred)
+def configure_plot_font(
+    preferred: Optional[str] = None,
+    *,
+    strict: bool = False,
+    font_dir: Optional[str | Path] = None,
+) -> str:
+    """从显式目录及仓库字体中注册字体，并配置 Matplotlib 默认字体。"""
+
+    directory_family: str | None = None
+    if font_dir is not None:
+        explicit_dir = Path(font_dir).expanduser().resolve()
+        if not explicit_dir.is_dir():
+            raise ValueError(f"font directory is not available: {explicit_dir}")
+        font_files = sorted(
+            file
+            for pattern in ("*.ttf", "*.otf")
+            for file in explicit_dir.rglob(pattern)
+        )
+        if not font_files:
+            raise ValueError(
+                f"font directory contains no TTF or OTF fonts: {explicit_dir}"
+            )
+        for font_file in font_files:
+            font_manager.fontManager.addfont(font_file)
+        families = {
+            font_manager.FontProperties(fname=font_file).get_name()
+            for font_file in font_files
+        }
+        if len(families) != 1:
+            names = ", ".join(sorted(families))
+            raise ValueError(
+                f"font directory must contain exactly one family, found: {names}"
+            )
+        directory_family = families.pop()
+
+    if preferred is None and directory_family is not None:
+        preferred = directory_family
+
+    if strict and preferred:
+        _register_bundled_fonts()
+        try:
+            font_manager.findfont(
+                font_manager.FontProperties(family=preferred),
+                fallback_to_default=False,
+            )
+        except ValueError as error:
+            raise ValueError(f"configured font is not available: {preferred}") from error
+        selected = preferred
+    else:
+        selected = _publication_font(preferred)
     plt.rcParams["font.family"] = selected
     return selected
 

@@ -155,7 +155,7 @@ DEFAULT_REGISTRY = OperationRegistry(
             allowed=(
                 "enabled", "height", "scale_loc", "label", "label_alignment", "unit",
                 "fancy", "vertical", "box", "transparency", "font_annot_primary",
-                "font_label",
+                "font_label", "map_scale_height",
             ),
             bools=("enabled", "unit", "fancy", "vertical", "box"),
             floats=("transparency",),
@@ -211,6 +211,8 @@ DEFAULT_REGISTRY = OperationRegistry(
             required=("position",),
             allowed=(
                 "enabled", "box", "width", "font", "mode", "row_gap", "padding",
+                "symbol_offset", "line_length", "front_spacing", "front_size",
+                "text_offset",
             ),
             bools=("enabled", "box"),
             handler="legend",

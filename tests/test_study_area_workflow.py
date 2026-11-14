@@ -16,14 +16,19 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = (
     REPOSITORY_ROOT
     / "config_examples"
-    / "visualization"
     / "study_area"
-    / "study_area.cfg"
+    / "footprint.cfg"
 )
 
 
 class StudyAreaWorkflowTests(unittest.TestCase):
     """Verify the example, direct workflow, and unified CLI contract."""
+
+    def test_examples_use_the_flat_workflow_layout(self) -> None:
+        """Reject reintroducing the redundant visualization directory level."""
+
+        self.assertTrue(EXAMPLE.is_file())
+        self.assertFalse((REPOSITORY_ROOT / "config_examples/visualization").exists())
 
     def test_documented_example_loads_in_expected_order(self) -> None:
         """Resolve the distributable CFG and every text fixture from its directory."""
