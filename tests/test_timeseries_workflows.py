@@ -1,41 +1,29 @@
-"""Regression tests for the cfg-driven spatial and auxiliary time-series readers."""
+"""Regression tests for cfg-driven spatial and auxiliary time-series readers."""
 
 from __future__ import annotations
 
-from dataclasses import replace
-import sys
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
 
 import numpy as np
-import rasterio
+
+from geodesy_visualization.workflows.insar import timeseries_aux as auxiliary
+from geodesy_visualization.workflows.insar import timeseries_map as spatial
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPOSITORY_ROOT))
-
-from geodesy_visualization.workflows.insar import timeseries_aux as canonical_aux
-from geodesy_visualization.workflows.insar import timeseries_map as canonical_map
-from insar_data_adapter import CanonicalGridWriter, GridMetadata
-
-
-SPATIAL = canonical_map
-AUXILIARY = canonical_aux
 
 
 class SpatialTimeSeriesTests(unittest.TestCase):
+    """Verify the plot-ready wide-table contract."""
+
     def test_default_cfg_is_migrated_example(self) -> None:
-        """Use the package workflow and migrated example configuration."""
-        parsed = canonical_map.build_parser().parse_args([])
+        """Use the package workflow and flattened example configuration."""
+        parsed = spatial.build_parser().parse_args([])
         self.assertEqual(
             Path(parsed.config),
-            REPOSITORY_ROOT
-            / "config_examples"
-            / "visualization"
-            / "timeseries_map"
-            / "timeseries_map.cfg",
+            REPOSITORY_ROOT / "config_examples" / "timeseries_map" / "timeseries_map.cfg",
         )
 
     def test_resolves_file_cpt_relative_to_config(self) -> None:
@@ -46,26 +34,22 @@ class SpatialTimeSeriesTests(unittest.TestCase):
             config.write_text(
                 "data_file = data.txt\n"
                 "dates_file = dates.txt\n"
-                "region_west = 0\n"
-                "region_east = 1\n"
-                "region_south = 0\n"
-                "region_north = 1\n"
-                "cpt = palette.cpt\n"
-                "font_bold = true\n",
+                "region_west = 0\nregion_east = 1\n"
+                "region_south = 0\nregion_north = 1\n"
+                "cpt = palette.cpt\nfont_bold = true\n",
                 encoding="utf-8",
             )
-            cfg = SPATIAL.load_config(str(config))
+            cfg = spatial.load_config(str(config))
             self.assertEqual(cfg["cpt"], str((root / "palette.cpt").resolve()))
             self.assertTrue(cfg["font_bold"])
 
-    def test_selects_one_based_epochs_scales_and_preserves_missing_values(self) -> None:
+    def test_selects_epochs_scales_and_preserves_missing_values(self) -> None:
         """Read only requested epochs and treat configured sentinels as missing."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             dates = root / "images"
             dates.write_text(
-                "epoch_index date_yyyymmdd\n"
-                "1 20200101\n2 20200113\n3 20200125\n",
+                "epoch_index date_yyyymmdd\n1 20200101\n2 20200113\n3 20200125\n",
                 encoding="utf-8",
             )
             table = root / "wide.txt"
@@ -76,7 +60,7 @@ class SpatialTimeSeriesTests(unittest.TestCase):
                 "10 20 1 2 3\n11 21 4 -9999 6\n",
                 encoding="utf-8",
             )
-            lon, lat, values, selected_dates = SPATIAL.load_timeseries_table(
+            lon, lat, values, selected_dates = spatial.load_timeseries_table(
                 str(table), str(dates), 2, 3, 10.0, 1, ["-9999"]
             )
         np.testing.assert_allclose(lon, [10, 11])
@@ -85,271 +69,48 @@ class SpatialTimeSeriesTests(unittest.TestCase):
         self.assertTrue(np.isnan(values[1, 0]))
         self.assertEqual(selected_dates, ["20200113", "20200125"])
 
-    def test_canonical_source_streams_masked_rows_without_dates_table(self) -> None:
-        """Route canonical cfg input through bounded blocks and preserve its mask."""
+    def test_processing_sources_are_rejected_at_config_boundary(self) -> None:
+        """Keep canonical HDF5 conversion in envInSAR instead of envPlot."""
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            product = root / "canonical.h5"
-            metadata = GridMetadata(
-                source_format="synthetic",
-                deformation_unit="mm",
-                deformation_quantity="cumulative_displacement",
-                los_positive="toward_satellite",
-                crs="EPSG:4326",
-                nodata_policy="valid_mask is authoritative; zero is valid",
-                temporal_reference="20200101",
-                spatial_reference="none",
-                source_provenance="timeseries map test",
-            )
-            valid = np.ones((3, 2), dtype=bool)
-            valid[1, 1] = False
-            values = np.arange(12, dtype=np.float32).reshape(2, 3, 2)
-            with CanonicalGridWriter(
-                product,
-                ("20200101", "20200113"),
-                rows=3,
-                columns=2,
-                x=(10.0, 11.0),
-                y=(22.0, 21.0, 20.0),
-                metadata=metadata,
-                chunk_rows=1,
-            ) as writer:
-                writer.write_geometry_rows(0, np.ones((3, 2)), valid)
-                writer.write_epoch(0, values[0])
-                writer.write_epoch(1, values[1])
-            config = root / "canonical.cfg"
-            config.write_text(
-                "data_source = canonical\n"
-                "data_file = canonical.h5\n"
-                "canonical_unit = mm\n"
-                "canonical_crs = EPSG:4326\n"
-                "region_west = 9\nregion_east = 12\n"
-                "region_south = 19\nregion_north = 23\n"
-                "subplot_rows = 1\nsubplot_columns = 2\n"
-                "start_epoch = 1\nend_epoch = 2\n"
-                "data_scale = 2\nchunk_rows = 1\n",
-                encoding="utf-8",
-            )
-            cfg = canonical_map.load_config(str(config))
-            self.assertEqual(cfg["data_source"], "canonical")
-            self.assertEqual(cfg["dates_file"], "")
-            selection = canonical_map.load_canonical_grid_selection(
-                str(cfg["data_file"]),
-                int(cfg["start_epoch"]),
-                int(cfg["end_epoch"]),
-                expected_unit=str(cfg["canonical_unit"]),
-                expected_crs=str(cfg["canonical_crs"]),
-            )
-            calls: list[dict[str, object]] = []
-
-            class RecordingFigure:
-                """Capture bounded scatter calls without starting GMT."""
-
-                def plot(self, **kwargs: object) -> None:
-                    """Retain one scatter batch for numerical assertions."""
-                    calls.append(kwargs)
-
-            def fake_render_panels(cfg_value, dates, draw_data):
-                """Invoke the real canonical data callback for every fake panel."""
-                figure = RecordingFigure()
-                for index in range(len(dates)):
-                    draw_data(figure, index)
-                return Path(str(cfg_value["output"]))
-
-            with mock.patch.object(
-                canonical_map, "_render_panels", side_effect=fake_render_panels
-            ):
-                destination = canonical_map.render_canonical(cfg, selection)
-
-        self.assertEqual(destination, Path(str(cfg["output"])))
-        self.assertEqual(len(calls), 6)
-        first_epoch = calls[:3]
-        np.testing.assert_allclose(
-            np.concatenate([call["fill"] for call in first_epoch]),
-            np.array([0, 1, 2, 4, 5], dtype=float) * 2,
-        )
-        np.testing.assert_allclose(
-            np.concatenate([call["x"] for call in first_epoch]),
-            [10, 11, 10, 10, 11],
-        )
-        np.testing.assert_allclose(
-            np.concatenate([call["y"] for call in first_epoch]),
-            [22, 22, 21, 20, 20],
-        )
-
-    def test_table_source_still_requires_dates_file(self) -> None:
-        """Keep the legacy table contract strict while canonical owns its dates."""
-        with tempfile.TemporaryDirectory() as directory:
-            config = Path(directory) / "missing_dates.cfg"
-            config.write_text(
-                "data_source = table\ndata_file = values.txt\n"
-                "region_west = 0\nregion_east = 1\n"
-                "region_south = 0\nregion_north = 1\n",
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "dates_file is required"):
-                canonical_map.load_config(str(config))
-
-    def test_canonical_scatter_rejects_projected_crs(self) -> None:
-        """Reject projected axes because this workflow does not reproject them."""
-        with tempfile.TemporaryDirectory() as directory:
-            config = Path(directory) / "projected.cfg"
+            config = Path(directory) / "canonical.cfg"
             config.write_text(
                 "data_source = canonical\ndata_file = values.h5\n"
-                "canonical_crs = EPSG:32628\n"
+                "dates_file = dates.txt\n"
                 "region_west = 0\nregion_east = 1\n"
                 "region_south = 0\nregion_north = 1\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(ValueError, "geographic CRS"):
-                canonical_map.load_config(str(config))
-
-    def test_canonical_grid_writes_north_up_masked_epoch_by_rows(self) -> None:
-        """Create one temporary raster with correct axis reversal, mask, and scale."""
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            product = root / "canonical.h5"
-            metadata = GridMetadata(
-                source_format="synthetic",
-                deformation_unit="mm",
-                deformation_quantity="cumulative_displacement",
-                los_positive="toward_satellite",
-                crs="EPSG:4326",
-                nodata_policy="valid_mask is authoritative; zero is valid",
-                temporal_reference="20200101",
-                spatial_reference="none",
-                source_provenance="grid orientation test",
-            )
-            valid = np.ones((3, 2), dtype=bool)
-            valid[1, 1] = False
-            with CanonicalGridWriter(
-                product,
-                ("20200101",),
-                rows=3,
-                columns=2,
-                x=(11.0, 10.0),
-                y=(20.0, 21.0, 22.0),
-                metadata=metadata,
-                chunk_rows=1,
-            ) as writer:
-                writer.write_geometry_rows(0, np.zeros((3, 2)), valid)
-                writer.write_epoch(
-                    0,
-                    np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32),
-                )
-            config = root / "grid.cfg"
-            config.write_text(
-                "data_source = canonical\nrender_mode = grid\n"
-                "data_file = canonical.h5\ncanonical_unit = mm\n"
-                "canonical_crs = EPSG:4326\n"
-                "region_west = 9\nregion_east = 12\n"
-                "region_south = 19\nregion_north = 23\n"
-                "subplot_rows = 1\nsubplot_columns = 1\n"
-                "start_epoch = 1\nend_epoch = 1\n"
-                "data_scale = 2\nchunk_rows = 1\n",
-                encoding="utf-8",
-            )
-            cfg = canonical_map.load_config(str(config))
-            selection = canonical_map.load_canonical_grid_selection(
-                product,
-                expected_unit="mm",
-                expected_crs="EPSG:4326",
-            )
-            self.assertTrue(canonical_map._canonical_grid_is_supported(selection))
-            gridline_selection = replace(
-                selection,
-                metadata=replace(selection.metadata, grid_registration="gridline"),
-            )
-            self.assertFalse(
-                canonical_map._canonical_grid_is_supported(gridline_selection)
-            )
-            rasters: list[tuple[np.ndarray, object, object]] = []
-
-            class RecordingFigure:
-                """Read the temporary raster while it exists inside the callback."""
-
-                def grdimage(self, *, grid: str, **kwargs: object) -> None:
-                    """Capture raster values, bounds, CRS, and plotting options."""
-                    with rasterio.open(grid) as dataset:
-                        rasters.append(
-                            (dataset.read(1), dataset.bounds, dataset.crs)
-                        )
-                    self.options = kwargs
-
-            figure = RecordingFigure()
-
-            def fake_render_panels(cfg_value, dates, draw_data):
-                """Run the real grid callback without creating a GMT session."""
-                for index in range(len(dates)):
-                    draw_data(figure, index)
-                return Path(str(cfg_value["output"]))
-
-            with mock.patch.object(
-                canonical_map, "_render_panels", side_effect=fake_render_panels
-            ):
-                canonical_map.render_canonical_grid(cfg, selection)
-
-            self.assertFalse(list(root.glob(".pygmt_*.tif")))
-
-        self.assertEqual(len(rasters), 1)
-        np.testing.assert_allclose(
-            rasters[0][0],
-            [[12, 10], [np.nan, 6], [4, 2]],
-            equal_nan=True,
-        )
-        self.assertEqual(tuple(rasters[0][1]), (9.5, 19.5, 11.5, 22.5))
-        self.assertEqual(rasters[0][2].to_string(), "EPSG:4326")
-        self.assertEqual(figure.options["interpolation"], "n")
-        self.assertEqual(figure.options["transparency"], 0)
-
-    def test_grid_mode_rejects_table_source(self) -> None:
-        """Keep gridded rendering limited to canonical regular-grid products."""
-        with tempfile.TemporaryDirectory() as directory:
-            config = Path(directory) / "table_grid.cfg"
-            config.write_text(
-                "data_source = table\nrender_mode = grid\n"
-                "data_file = values.txt\ndates_file = dates.txt\n"
-                "region_west = 0\nregion_east = 1\n"
-                "region_south = 0\nregion_north = 1\n",
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(ValueError, "requires data_source=canonical"):
-                canonical_map.load_config(str(config))
+            with self.assertRaisesRegex(ValueError, "data_source"):
+                spatial.load_config(str(config))
 
 
 class AuxiliaryTimeSeriesTests(unittest.TestCase):
-    def test_legacy_script_reexports_canonical_workflow(self) -> None:
-        """Keep the old script API and default cfg bound to the package workflow."""
-        self.assertIs(AUXILIARY.load_config, canonical_aux.load_config)
-        self.assertIs(AUXILIARY.read_date_value_table, canonical_aux.read_date_value_table)
-        self.assertIs(AUXILIARY.render, canonical_aux.render)
-        parsed = canonical_aux.build_parser().parse_args([])
+    """Verify the auxiliary date/value table contract."""
+
+    def test_default_cfg_is_flattened_example(self) -> None:
+        """Keep the CLI bound to the current example directory."""
+        parsed = auxiliary.build_parser().parse_args([])
         self.assertEqual(
             Path(parsed.config),
-            REPOSITORY_ROOT
-            / "config_examples"
-            / "visualization"
-            / "timeseries_aux"
-            / "timeseries_aux.cfg",
+            REPOSITORY_ROOT / "config_examples" / "timeseries_aux" / "timeseries_aux.cfg",
         )
 
     def test_sorts_dates_and_rejects_duplicates(self) -> None:
         """Normalize unsorted input while rejecting ambiguous repeated dates."""
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            table = root / "series.txt"
+            table = Path(directory) / "series.txt"
             table.write_text(
                 "date_yyyymmdd deformation_mm\n20200113 2\n20200101 1\n",
                 encoding="utf-8",
             )
-            result = AUXILIARY.read_date_value_table(str(table), "deformation_mm")
+            result = auxiliary.read_date_value_table(str(table), "deformation_mm")
             self.assertEqual(result["value"].tolist(), [1, 2])
             table.write_text(
                 "date_yyyymmdd deformation_mm\n20200101 1\n20200101 2\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "duplicate"):
-                AUXILIARY.read_date_value_table(str(table), "deformation_mm")
+                auxiliary.read_date_value_table(str(table), "deformation_mm")
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ from geodesy_visualization.backends.pygmt import PyGMTPlotter
 
 
 DEFAULT_CONFIG = resource_path(
-    "config_examples", "visualization", "timeseries_aux", "timeseries_aux.cfg"
+    "config_examples", "timeseries_aux", "timeseries_aux.cfg"
 )
 
 

@@ -11,7 +11,6 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import rasterio
-from insar_data_adapter import PointValueMetadata
 from rasterio.transform import from_origin
 
 
@@ -124,8 +123,8 @@ class GridConversionTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
 
-    def test_converts_tif_through_adapter(self) -> None:
-        """Convert a raster through Adapter without leaving temporary files behind."""
+    def test_converts_plot_ready_tif_without_processing_dependency(self) -> None:
+        """Convert a standardized raster without leaving temporary files behind."""
         tif_path = self.root / "input.tif"
         with rasterio.open(
             tif_path,
@@ -159,8 +158,8 @@ class GridConversionTests(unittest.TestCase):
         self.assertTrue(text_grid.is_file())
         self.assertEqual(list(self.root.glob(".pygmt_*")), [])
 
-    def test_converts_headerless_projected_defsour_fourth_column(self) -> None:
-        """Transform Defsour UTM coordinates and select deformation rather than elevation."""
+    def test_rejects_defsour_processing_format(self) -> None:
+        """Require Defsour conversion to happen in envInSAR."""
         source = self.root / "D20200101"
         source.write_text(
             "166021.443 0.000 123.000 4.500000\n"
@@ -169,27 +168,14 @@ class GridConversionTests(unittest.TestCase):
         )
         output = self.root / "defsour.grd"
 
-        def fake_xyz2grd(*, data, region, spacing, outgrid):
-            """Capture the generated geographic XYZ table and emulate GMT output."""
-            generated = pd.read_csv(data, sep=r"\s+", header=None)
-            self.assertTrue(np.allclose(generated.iloc[:, 2], [4.5, -2.0]))
-            self.assertTrue(np.allclose(generated.iloc[:, 0], [0.0, 0.999697], atol=1.0e-4))
-            self.assertTrue(np.allclose(generated.iloc[:, 1], [0.0, 1.0], atol=1.0e-4))
-            Path(outgrid).write_bytes(b"grid")
-
-        with patch(
-            "geodesy_visualization.grid_preparation.pygmt.xyz2grd",
-            side_effect=fake_xyz2grd,
-        ):
-            region = defsour2grd(
+        with self.assertRaisesRegex(ValueError, "processing format"):
+            defsour2grd(
                 str(source), str(output), "EPSG:32631", space=0.5, chunk_rows=1
             )
-        self.assertTrue(np.allclose(region, [-7.3e-10, 0.9999999993, 0.0, 1.0], atol=1.0e-6))
-        self.assertTrue(output.is_file())
-        self.assertEqual(list(self.root.glob(".pygmt_*")), [])
+        self.assertFalse(output.exists())
 
-    def test_converts_named_headered_points_through_adapter(self) -> None:
-        """Delegate named non-positional TXT roles while preserving display scaling."""
+    def test_converts_named_headered_exchange_points(self) -> None:
+        """Select named TXT roles while preserving display scaling."""
         source = self.root / "named_points.txt"
         source.write_text(
             "id lat velocity lon quality\n"
@@ -198,18 +184,6 @@ class GridConversionTests(unittest.TestCase):
             encoding="utf-8",
         )
         output = self.root / "named_points.grd"
-        metadata = PointValueMetadata(
-            source_format="headered_text_points",
-            value_unit="cm/yr",
-            value_quantity="velocity",
-            los_positive="toward_satellite",
-            crs="EPSG:4326",
-            nodata_policy="NaN is nodata; zero is valid",
-            temporal_reference="source velocity interval",
-            spatial_reference="none",
-            source_provenance=str(source),
-        )
-
         def fake_xyz2grd(*, data, region, spacing, outgrid):
             """Verify named roles and scaling, then emulate one GMT output."""
             generated = pd.read_csv(data, sep=r"\s+", header=None)
@@ -229,7 +203,6 @@ class GridConversionTests(unittest.TestCase):
                 space=0.5,
                 chunk_rows=1,
                 value_column="velocity",
-                metadata=metadata,
             )
         self.assertEqual(region, [20.0, 21.0, 10.0, 11.0])
         self.assertTrue(output.is_file())

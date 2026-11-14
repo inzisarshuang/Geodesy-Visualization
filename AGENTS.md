@@ -8,7 +8,7 @@ This file defines the rules an AI coding agent or human contributor should read 
 - Reuse `src/geodesy_visualization/io.py`, `src/geodesy_visualization/geo.py`, `src/geodesy_visualization/backends/pygmt.py`, and `lib/pygmt_geo.py` before adding helpers. `lib/pygmt_io.py` and `lib/pygmt_visual.py` are compatibility imports only.
 - Keep configuration and file mechanics in `geodesy_visualization.io`, figure-oriented grid inspection and profile sampling in `geodesy_visualization.geo`, transitional conversions in `pygmt_geo`, and PyGMT figure composition in `geodesy_visualization.backends.pygmt`.
 - Put canonical cfg-driven workflow orchestration under `src/geodesy_visualization/workflows`; keep only the explicitly documented `lib/` modules as compatibility imports.
-- Read canonical HDF5 only through the installed `insar_data_adapter` public API; never import a sibling repository path or access its private HDF5 handle.
+- Do not import or depend on `insar_data_adapter`. Defsour, canonical HDF5, reprojection, and scientific unit conversion run in `envInSAR`; Visualization consumes plot-ready GeoTIFF, GRD, or standardized geographic tables in `envPlot`.
 - Before changing or moving `lib/pygmt_geo.py`, read and update `docs/development/pygmt_geo_ownership.md`; do not move that mixed module wholesale.
 - Before adding or renaming font, axis, CPT, colorbar, spacing, or panel-layout cfg keys, read `docs/development/style_cfg_contract.md` and preserve its scope/precedence rules.
 - Add domain, mask, or export modules only when the repository has independent behavior to own; do not create empty pipeline stages.

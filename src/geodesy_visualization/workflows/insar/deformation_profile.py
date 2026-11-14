@@ -130,7 +130,7 @@ def load_dataset_cfg(
         "label": get_optional(cfg, f"{prefix}_label", default_output_stub),
         "title": get_optional(cfg, f"{prefix}_title", default_title),
         "input_type": parse_choice(
-            get_optional(cfg, f"{prefix}_input_type", "tif"), ("tif", "txt", "defsour"), f"{prefix}_input_type"
+            get_optional(cfg, f"{prefix}_input_type", "tif"), ("tif", "txt"), f"{prefix}_input_type"
         ),
         "input_path": resolve_path(get_required(cfg, f"{prefix}_input_path"), base_dir),
         "grd_path": resolve_path(get_optional(cfg, f"{prefix}_grd", grd_default), base_dir),
@@ -275,8 +275,6 @@ def load_config(config_path: str) -> dict:
             raise ValueError(f"{prefix}_space must be positive")
         if dataset["chunk_rows"] <= 0:
             raise ValueError(f"{prefix}_chunk_rows must be positive")
-        if dataset["input_type"] == "defsour" and not dataset["input_crs"]:
-            raise ValueError(f"{prefix}_input_crs is required for Defsour input")
         if dataset["deformation_column"] < 0:
             raise ValueError(f"{prefix}_deformation_column must be non-negative")
         validate_closed_range(

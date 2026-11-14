@@ -15,11 +15,11 @@ symlink; Python imports, workflow entry points, and cfg contracts are unchanged.
 ## 1. Repository Scope / 仓库定位
 
 This repository owns publication visualization and reusable, analysis-neutral drawing
-backends. It consumes validated Analysis or DataAdapter products and does not rerun
-GAMMA scientific processing or modify upstream results.
+backends. It consumes plot-ready GeoTIFF, GRD, and standardized geographic tables;
+processing-format conversion remains in `envInSAR` and does not enter `envPlot`.
 
-本仓库负责最终制图和可复用、与分析方法解耦的绘图后端。它读取已经校验的 Analysis
-或 DataAdapter 产品，不重新执行 GAMMA 科学处理，也不修改上游结果。
+本仓库负责最终制图和可复用、与分析方法解耦的绘图后端。它只读取已准备好的
+GeoTIFF、GRD 和标准地理表；处理格式转换保留在 `envInSAR`，不进入 `envPlot`。
 
 Stage-owned scientific quicklooks remain with the processing command that creates the
 result; maps, profiles, time-series panels, and other secondary renderings belong here.
@@ -40,8 +40,6 @@ Geodesy-Visualization/
 ├── src/geodesy_visualization/            # new public Python package / 新公共 Python 包
 │   ├── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
 │   ├── geo.py                        # view geometry and sampling / 视图几何与采样
-│   ├── data/
-│   │   └── canonical_grid.py         # bounded canonical HDF5 consumer / 标准 HDF5 分块消费层
 │   ├── figure_ops/                    # ordered PyGMT operation plans / 有序 PyGMT 操作计划
 │   ├── workflows/cartography/
 │   │   └── study_area.py              # study-area and footprint workflow / 研究区与 footprint 流程
@@ -131,9 +129,10 @@ geodesy-visualization study-area \
 
 ### 3.2 Deformation Map / 形变地图
 
-The deformation-map workflow converts TIF, lon/lat TXT, or Defsour deformation data to GMT GRD and draws it over a DEM, optical image, or blank basemap.
+The deformation-map workflow prepares plot-ready GeoTIFF or standardized lon/lat TXT as a temporary GMT GRD and draws it over a DEM, optical image, or blank basemap.
 
-形变地图 workflow 将 TIF、经纬度 TXT 或 Defsour 形变数据转换为 GMT GRD，并叠加到 DEM、光学影像或空白底图。
+形变地图 workflow 将已准备的 GeoTIFF 或标准经纬度 TXT 临时生成 GMT GRD，
+并叠加到 DEM、光学影像或空白底图。
 
 The installed `geodesy-visualization` command is the formal workflow
 orchestrator. All runnable examples are kept under
@@ -188,11 +187,10 @@ The time-series workflows provide cfg-driven geographic panels and shared-date-a
 
 - `src/geodesy_visualization/io.py`: canonical strict cfg parsing, path resolution, parameter validation, temporary files, atomic replacement, and GDAL command wrappers.<br>正式负责严格 cfg 解析、路径处理、参数校验、临时文件、原子替换和 GDAL 命令封装。
 - `src/geodesy_visualization/geo.py`: canonical figure-oriented grid-region inspection, profile-track geometry, and profile sampling.<br>正式负责面向图件的网格范围读取、剖面轨迹几何和剖面采样。
-- `src/geodesy_visualization/grid_preparation.py`: canonical Adapter-backed GeoTIFF, named TXT, and Defsour preparation for temporary GMT grids, plus source-neutral dataset dispatch.<br>正式负责由 Adapter 驱动的 GeoTIFF、具名 TXT 与 Defsour 临时 GMT 网格准备，以及来源中立的数据集调度。
+- `src/geodesy_visualization/grid_preparation.py`: validates plot-ready geographic GeoTIFF or named lon/lat tables, applies display scaling, and creates temporary GMT grids.<br>校验已准备的地理 GeoTIFF 或具名经纬度表，应用显示缩放并生成临时 GMT 网格。
 - `src/geodesy_visualization/styles.py`: shared cfg font/colorbar metadata parsers and CPT-reference resolver; the scope contract is documented in `docs/development/style_cfg_contract.md`.<br>统一的 cfg 字体/色标元数据解析器和 CPT 引用解析器；作用域契约见 `docs/development/style_cfg_contract.md`。
 - `src/geodesy_visualization/figure_ops/`: strict ordered Figure-plan parsing, operation dispatch, footprint/fault preparation, and PyGMT version adapters.<br>严格的有序 Figure 计划解析、操作分派、footprint/断层准备及 PyGMT 版本适配。
 - `src/geodesy_visualization/workflows/cartography/study_area.py`: canonical study-area and product-footprint orchestration.<br>正式的研究区与产品 footprint 制图编排。
-- `src/geodesy_visualization/data/canonical_grid.py`: validates canonical grid selections through Adapter 0.11, preserves complete scientific metadata, and yields raw deformation plus masks by bounded row blocks.<br>通过 Adapter 0.11 校验标准规则栅格选择，完整保留科学元数据，并按受控行块提供原始形变和掩膜。
 - `lib/pygmt_io.py`: compatibility re-export for existing imports; it contains no separate implementation.<br>为现有导入路径提供兼容重导出，不包含独立实现。
 - `lib/pygmt_geo.py`: compatibility re-export for grid preparation and geo views; the unused scientific `add_tifs` remains temporarily as a deprecated compatibility API.<br>临时网格准备和地理视图的兼容重导出；无生产调用的科学运算 `add_tifs` 暂作为已弃用兼容 API 保留。
 - `src/geodesy_visualization/backends/pygmt.py`: canonical PyGMT figure state, map layers, profile plots, annotations, legends, and final figure output.<br>正式负责 PyGMT 图形状态、地图图层、剖面图、注记、图例和最终图片输出。
@@ -214,7 +212,7 @@ The time-series workflows provide cfg-driven geographic panels and shared-date-a
 - Python 3.10 or newer; the recommended Conda environment name is `envPlot`.<br>Python 3.10 或更高版本，推荐 Conda 环境名为 `envPlot`。
 - GMT and PyGMT for map and grid operations.<br>GMT 与 PyGMT，用于地图和网格操作。
 - GDAL with `gdal_translate` available on `PATH`.<br>GDAL，并确保 `gdal_translate` 位于 `PATH`。
-- Rasterio, PyProj, NumPy, Pandas, Matplotlib, and `insar-data-adapter>=0.11.0` for GeoTIFF adaptation, tabular point-source, Defsour, canonical-HDF5 access, and engine-neutral scientific figures.<br>Rasterio、PyProj、NumPy、Pandas、Matplotlib 及 `insar-data-adapter>=0.11.0`，用于 GeoTIFF 适配、带表头点来源、Defsour、标准 HDF5 访问及绘图引擎中立的科研图件。
+- Rasterio, PyProj, NumPy, Pandas, and Matplotlib for plot-ready raster/table input and engine-neutral scientific figures.<br>Rasterio、PyProj、NumPy、Pandas 和 Matplotlib，用于已准备栅格/表格输入及绘图引擎中立的科研图件。
 
 ### 4.2 Installation / 安装方法
 
@@ -225,19 +223,15 @@ conda create -n envPlot -c conda-forge \
   python=3.10 pygmt=0.10 gmt gdal rasterio pyproj numpy pandas h5py -y
 conda activate envPlot
 
-# Until insar-data-adapter is published, install its checkout first.
-# 在 insar-data-adapter 发布前，先从本地仓库安装 Adapter。
-python -m pip install -e ../Geodesy-DataAdapter
-
 # Install the complete Visualization package and all plotting backends.
 # 安装完整 Visualization 包及全部绘图后端。
 python -m pip install -e '.[all]'
 ```
 
 An Analysis environment that only consumes the Matplotlib backend can avoid
-GMT, PyGMT, Rasterio, and Adapter dependencies:
+GMT, PyGMT, and Rasterio dependencies:
 
-只使用 Matplotlib 后端的 Analysis 环境无需安装 GMT、PyGMT、Rasterio 或 Adapter：
+只使用 Matplotlib 后端的 Analysis 环境无需安装 GMT、PyGMT 或 Rasterio：
 
 ```bash
 python -m pip install -e '../Geodesy-Visualization[matplotlib]'
@@ -250,7 +244,7 @@ PyGMT `0.10.0` is the verified server version. Later compatible versions may be 
 ### 4.3 Environment Check / 环境自检
 
 ```bash
-python -c "import pygmt, rasterio, pyproj, numpy, pandas, insar_data_adapter; print('envPlot OK')"
+python -c "import pygmt, rasterio, pyproj, numpy, pandas; print('envPlot OK')"
 gmt --version
 gdal_translate --version
 ```
@@ -335,25 +329,17 @@ Each example cfg documents every supported key, unit, valid choice, and output o
   spatial time-series columns use
   `epoch_NNN_deformation_YYYYMMDD_mm` and are checked against
   `epoch_index date_yyyymmdd` in the dates table.<br>示例文本输入均使用包含单位的明确表头。地理点表以 `lon lat` 开头，辅助时序表以 `date_yyyymmdd` 开头；空间时序列使用 `epoch_NNN_deformation_YYYYMMDD_mm`，并与日期表中的 `epoch_index date_yyyymmdd` 逐列核对。
-- Spatial time-series cfg files select `data_source=table|canonical` and
-  `render_mode=scatter|grid|auto`. Canonical
-  HDF5 is validated through Adapter 0.8, including unit and CRS, and sent to
-  the scatter renderer by bounded epoch/row blocks, or to grid rendering through
-  one temporary row-written GeoTIFF per epoch. `auto` selects grid only for
-  regular pixel-registered canonical axes; table input remains scatter. Canonical
-  input does not need a separate dates table.<br>
-  空间时序 cfg 使用 `data_source=table|canonical` 和
-  `render_mode=scatter|grid|auto` 选择数据与绘制方式。标准 HDF5 通过 Adapter
-  0.8 校验单位和 CRS，可按时期、行块送入散点绘制，也可逐期分块写入一个临时
-  GeoTIFF 后进行网格绘制。`auto` 仅对规则、像元注册的 canonical 坐标轴选择
-  grid；table 输入仍使用 scatter。canonical 输入无需独立日期表。
+- Spatial time-series cfg files use `data_source=table` and
+  `render_mode=scatter`. Processing products such as canonical HDF5 must be
+  exported in `envInSAR` before plotting.<br>
+  空间时序 cfg 使用 `data_source=table` 和 `render_mode=scatter`。canonical HDF5
+  等处理产品必须先在 `envInSAR` 中导出，再进入绘图。
 - The repository versions a spatially representative time-series example;
   full-resolution local tables remain ignored because GitHub rejects files
   larger than 100 MB.<br>仓库保存具有空间代表性的时序示例；完整分辨率本地表保持忽略，因为 GitHub 拒绝超过 100 MB 的单个文件。
 - TIF conversion reads raster blocks instead of loading a complete scene into memory.<br>TIF 转换按栅格块读取，不将整景数据一次性载入内存。
 - TXT point tables are scaled and passed to GMT in configurable chunks through `*_chunk_rows`.<br>TXT 点表按 `*_chunk_rows` 配置分块缩放并交给 GMT。
-- Headerless Defsour tables use zero-based columns `X=0`, `Y=1`, `elevation=2`, and `deformation=3`; configure `*_input_crs` and use `*_input_type=defsour`. Coordinates are transformed to WGS84 before gridding.<br>无表头 Defsour 表使用零基列号 `X=0`、`Y=1`、`高程=2`、`形变=3`；设置 `*_input_crs` 并选择 `*_input_type=defsour`，制网前自动转换到 WGS84。
-- Projected GeoTIFF inputs are reprojected to WGS84 by default; set `*_target_crs` explicitly only when a non-geographic plotting workflow requires it.<br>投影 GeoTIFF 默认重投影到 WGS84；只有非地理绘图流程才应显式修改 `*_target_crs`。
+- Defsour, canonical HDF5, CRS reprojection, and scientific unit conversion belong to Geodesy-DataAdapter in `envInSAR`; Visualization rejects those processing responsibilities.<br>Defsour、canonical HDF5、CRS 重投影和科学单位转换属于 `envInSAR` 中的 Geodesy-DataAdapter；Visualization 不再承担这些处理职责。
 - Pixel-wise raster arithmetic requires matching dimensions, transforms, and coordinate reference systems.<br>逐像元栅格运算要求尺寸、仿射变换和坐标参考系一致。
 - Zero and nodata remain distinct; conversion occurs only through explicit cfg options such as `*_nan_to_zero`.<br>零值与 nodata 始终区分，仅通过 `*_nan_to_zero` 等显式配置执行转换。
 - Grid scatter plots use temporary XYZ files instead of materializing a full Pandas DataFrame.<br>网格散点通过临时 XYZ 文件交给 GMT，不构造完整 Pandas DataFrame。

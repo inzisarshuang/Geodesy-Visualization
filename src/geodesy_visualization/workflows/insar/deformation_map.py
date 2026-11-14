@@ -3,8 +3,8 @@ geodesy_visualization.workflows.insar.deformation_map
 ====================================================
 
 功能概述:
-    读取严格 cfg 配置，通过过渡期 ``lib.pygmt_geo`` 边界准备 TIF、TXT 或
-    Defsour 绘图网格，并在 DEM 或光学影像底图上绘制网格或散点形变结果。
+    读取严格 cfg 配置，通过过渡期 ``lib.pygmt_geo`` 边界准备上游已导出的
+    GeoTIFF 或标准经纬度点表，并在 DEM 或光学影像底图上绘制形变结果。
     本模块负责工作流编排，不拥有持久格式转换实现。
 
 函数说明:
@@ -331,7 +331,7 @@ def load_config(config_path: str) -> dict:
 
     sbas_cfg = {
         "input_type": parse_choice(
-            get_optional(cfg, "sbas_input_type", "tif"), ("tif", "txt", "defsour"), "sbas_input_type"
+            get_optional(cfg, "sbas_input_type", "tif"), ("tif", "txt"), "sbas_input_type"
         ),
         "input_path": resolve_path(get_required(cfg, "sbas_input_path"), base_dir),
         "grd_path": sbas_grd,
@@ -361,7 +361,7 @@ def load_config(config_path: str) -> dict:
     if get_optional(cfg, "psi_input_path", ""):
         psi_cfg = {
             "input_type": parse_choice(
-                get_optional(cfg, "psi_input_type", "txt"), ("tif", "txt", "defsour"), "psi_input_type"
+                get_optional(cfg, "psi_input_type", "txt"), ("tif", "txt"), "psi_input_type"
             ),
             "input_path": resolve_path(get_required(cfg, "psi_input_path"), base_dir),
             "grd_path": psi_grd,
@@ -472,8 +472,6 @@ def load_config(config_path: str) -> dict:
             raise ValueError(f"{name}_space must be positive")
         if dataset["chunk_rows"] <= 0:
             raise ValueError(f"{name}_chunk_rows must be positive")
-        if dataset["input_type"] == "defsour" and not dataset["input_crs"]:
-            raise ValueError(f"{name}_input_crs is required for Defsour input")
         if dataset["deformation_column"] < 0:
             raise ValueError(f"{name}_deformation_column must be non-negative")
     return conf

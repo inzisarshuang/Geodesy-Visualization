@@ -4,7 +4,7 @@ geodesy_visualization
 
 功能概述:
     提供与具体工作流解耦的大地测量可视化公共接口；当前阶段公开配置、路径、
-    临时文件、原子输出、Matplotlib/PyGMT 后端和 Adapter 驱动的临时网格准备，
+    临时文件、原子输出、Matplotlib/PyGMT 后端和已准备交换文件的临时网格准备，
     不负责科学反演或持久来源数据转换。
 
 函数说明:

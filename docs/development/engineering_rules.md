@@ -6,7 +6,7 @@ This document explains the repository architecture behind the short rules in `AG
 
 - `src/geodesy_visualization/io.py`: strict cfg parsing, path resolution, scalar/list parsing, temporary files, atomic replacement, and external command wrappers.
 - `src/geodesy_visualization/geo.py`: figure-oriented grid-region inspection, profile-track geometry, and profile sampling; it does not own source parsing or persistent scientific export.
-- `src/geodesy_visualization/data/`: consumer-side selection and bounded iteration over validated Adapter products; it preserves scientific values and metadata without source parsing or conversion.
+- `src/geodesy_visualization/data/`: visualization-owned exchange models only; processing formats remain outside this environment.
 - `lib/pygmt_io.py`: temporary compatibility import for existing callers; it must not contain an independent implementation.
 - `lib/pygmt_geo.py`: transitional mixed module governed by `pygmt_geo_ownership.md`; package workflows may use the qualified `lib.pygmt_geo` compatibility boundary, but must not move it wholesale or add callers without updating that map.
 - `src/geodesy_visualization/backends/pygmt.py`: PyGMT figure state, map composition, profile drawing, legends, annotations, and final figure output.
@@ -17,7 +17,7 @@ This document explains the repository architecture behind the short rules in `AG
 
 Do not copy conversion branches or configuration parsers into an entry script. Extend the owning shared module when two workflows need the same behavior. New package-owned code belongs under `src/geodesy_visualization/`; legacy `lib/` paths remain only until their callers have compatibility coverage.
 
-Canonical HDF5 consumers import the installed `insar_data_adapter` package and use only its public API. They must not add a sibling checkout to `sys.path`, open the Adapter's private handle, or duplicate schema validation.
+Visualization must not import `insar_data_adapter`. Canonical HDF5 and Defsour products are exported to plot-ready GeoTIFF/GRD/geographic tables in `envInSAR` before use in `envPlot`.
 
 The reusable repository pattern is `I/O -> geospatial preparation -> domain processing -> export or visualization`. Masking and product export are optional ownership areas, not mandatory files. Create `*_mask.py` only for independent mask behavior and `*_export.py` only for external scientific product contracts; ordinary file writing remains I/O, while PNG/PDF output remains visualization.
 
