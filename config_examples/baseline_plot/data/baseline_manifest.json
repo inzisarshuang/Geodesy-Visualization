@@ -2,7 +2,6 @@
   "schema_version": 1,
   "status": "complete",
   "reference_date": "20231222",
-  "pair_count": 3,
   "network_path": "shortbaseline_3",
   "network_type": "SBAS",
   "source_note": "Synthetic manifest for the historical Jishishan LT-1 shortbaseline_3 reference network"

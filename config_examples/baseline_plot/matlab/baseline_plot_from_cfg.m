@@ -40,10 +40,9 @@ manifest = jsondecode(fileread(manifestPath));
 if ~isfield(manifest, 'status') || ~strcmp(char(manifest.status), 'complete')
     error('baseline:manifest:status', 'Manifest status must be complete.');
 end
-if ~isfield(manifest, 'reference_date') || ~isfield(manifest, 'pair_count') || ...
-        ~isfield(manifest, 'network_path')
+if ~isfield(manifest, 'reference_date') || ~isfield(manifest, 'network_path')
     error('baseline:manifest:fields', ...
-        'Manifest requires reference_date, pair_count, and network_path.');
+        'Manifest requires reference_date and network_path.');
 end
 referenceDate = str2double(char(manifest.reference_date));
 networkPath = confined_path(fileparts(manifestPath), ...
@@ -52,9 +51,9 @@ if ~isfile(networkPath)
     error('baseline:network:missing', 'Network not found: %s', networkPath);
 end
 baseline = readmatrix(networkPath, 'FileType', 'text');
-if size(baseline, 2) ~= 4 || size(baseline, 1) ~= double(manifest.pair_count)
+if isempty(baseline) || size(baseline, 2) ~= 4
     error('baseline:network:shape', ...
-        'Network must have pair_count rows and four columns.');
+        'Network must contain at least one row and exactly four columns.');
 end
 
 [dates, perpendicular] = solve_baselines(baseline, referenceDate);

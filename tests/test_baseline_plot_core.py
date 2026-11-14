@@ -47,7 +47,6 @@ class _ProductFactory:
             "schema_version": 1,
             "status": "complete",
             "reference_date": "20200101",
-            "pair_count": 3,
             "network_path": "baseline_select_SBAS",
             "network_type": "SBAS",
             "plot_path": "legacy_plot_may_not_exist.png",
@@ -70,7 +69,7 @@ class BaselineNetworkContractTests(_ProductFactory, unittest.TestCase):
             network = read_baseline_network(manifest)
 
         self.assertEqual(manifest.reference_date, "20200101")
-        self.assertEqual(manifest.pair_count, 3)
+        self.assertEqual(len(network.pairs), 3)
         self.assertEqual(
             [(pair.master, pair.slave) for pair in network.pairs],
             [
@@ -92,7 +91,6 @@ class BaselineNetworkContractTests(_ProductFactory, unittest.TestCase):
             ({"schema_version": 3}, "schema_version"),
             ({"status": "failed"}, "status"),
             ({"reference_date": "2020-01-01"}, "reference_date"),
-            ({"pair_count": 0}, "pair_count"),
             ({"network_path": "/tmp/network"}, "relative"),
             ({"network_path": "../network"}, "traverse"),
         )
@@ -111,6 +109,20 @@ class BaselineNetworkContractTests(_ProductFactory, unittest.TestCase):
             source = self._product(Path(other))
             with self.assertRaisesRegex(ValueError, "project"):
                 read_baseline_manifest(source, project_root=Path(project))
+
+    def test_pair_count_is_derived_from_network_instead_of_manifest(self) -> None:
+        """Allow users to edit pair rows without synchronizing redundant metadata."""
+
+        for updates in ({}, {"pair_count": 999}):
+            with self.subTest(updates=updates):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = read_baseline_manifest(
+                        self._product(root, manifest_updates=updates),
+                        project_root=root,
+                    )
+                    network = read_baseline_network(manifest)
+                    self.assertEqual(len(network.pairs), 3)
 
     def test_rejects_missing_or_empty_network(self) -> None:
         """Catch a manifest published without its declared scientific table."""
@@ -138,12 +150,12 @@ class BaselineNetworkContractTests(_ProductFactory, unittest.TestCase):
             ("20200101 20200101 0 0\n", {}, "self"),
             (
                 "20200101 20200113 10 12\n20200101 20200113 10 12\n",
-                {"pair_count": 2},
+                {},
                 "duplicate",
             ),
             (
                 "20200101 20200113 10 12\n20200113 20200101 -10 -12\n",
-                {"pair_count": 2},
+                {},
                 "reversed",
             ),
             ("20200101 20200113 nan 12\n", {}, "finite"),
@@ -151,12 +163,7 @@ class BaselineNetworkContractTests(_ProductFactory, unittest.TestCase):
             ("20200101 20200113 10\n", {}, "four"),
             (
                 "20200101 20200113 10 12\n",
-                {"pair_count": 2},
-                "pair_count",
-            ),
-            (
-                "20200101 20200113 10 12\n",
-                {"reference_date": "20200125", "pair_count": 1},
+                {"reference_date": "20200125"},
                 "reference",
             ),
         )
@@ -212,7 +219,7 @@ class BaselineNetworkRenderTests(_ProductFactory, unittest.TestCase):
         source = self._product(
             root,
             rows="20200101 20200113 10 12\n",
-            manifest_updates={"pair_count": 1},
+            manifest_updates={},
         )
         return read_baseline_network(
             read_baseline_manifest(source, project_root=root)

@@ -335,7 +335,6 @@ class BaselinePlotCliTests(unittest.TestCase):
                     "schema_version": 1,
                     "status": "complete",
                     "reference_date": "20200101",
-                    "pair_count": 1,
                     "network_path": "baseline_select_SBAS",
                 }
             ),
@@ -454,7 +453,7 @@ class BaselineExampleTests(unittest.TestCase):
         network = read_baseline_network(manifest)
 
         self.assertEqual(manifest.reference_date, "20231222")
-        self.assertEqual(manifest.pair_count, 3)
+        self.assertEqual(len(network.pairs), 3)
         self.assertEqual(
             [
                 (pair.master, pair.slave, pair.perpendicular_baseline_m)

@@ -148,7 +148,7 @@ The authoritative reference inputs are:
 - accepted preview: `Gansu_Jishishan_LT1/result_visual/study_area/refactored/perpendicular_baselines_distribution.png`, regenerated after MATLAB confirmed `AxesFontName=FreeSans` and `TitleFontName=FreeSans`.
 
 The repository example synthesizes a schema-valid completed manifest for the
-copied three-pair network (`pair_count = 3`, reference `20231222`); it does not
+copied three-pair network (reference `20231222`); it does not
 claim that this historical LT folder originally contained that manifest.
 
 Python continues to validate the versioned manifest and atomically publishes

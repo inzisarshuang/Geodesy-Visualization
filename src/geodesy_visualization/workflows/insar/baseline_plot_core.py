@@ -49,7 +49,6 @@ class BaselineManifest:
     project_root: Path
     network_path: Path
     reference_date: str
-    pair_count: int
     network_type: str
 
 
@@ -120,13 +119,6 @@ def read_baseline_manifest(
     reference_date = _date(
         payload.get("reference_date"), "baseline manifest reference_date"
     )
-    pair_count = payload.get("pair_count")
-    if (
-        not isinstance(pair_count, int)
-        or isinstance(pair_count, bool)
-        or pair_count < 1
-    ):
-        raise ValueError("baseline manifest pair_count must be a positive integer")
     raw_network = payload.get("network_path")
     if not isinstance(raw_network, str) or not raw_network.strip():
         raise ValueError("baseline manifest network_path is required")
@@ -150,7 +142,6 @@ def read_baseline_manifest(
         project_root=root,
         network_path=network_path,
         reference_date=reference_date,
-        pair_count=pair_count,
         network_type=network_type.strip().upper(),
     )
 
@@ -245,11 +236,6 @@ def read_baseline_network(manifest: BaselineManifest) -> BaselineNetwork:
         )
     if not pairs:
         raise ValueError(f"baseline network is empty: {path}")
-    if len(pairs) != manifest.pair_count:
-        raise ValueError(
-            "baseline manifest pair_count does not match network: "
-            f"{manifest.pair_count} != {len(pairs)}"
-        )
     ordered_dates = tuple(sorted(dates))
     if manifest.reference_date not in dates:
         raise ValueError(
