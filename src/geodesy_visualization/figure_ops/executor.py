@@ -3,8 +3,8 @@ geodesy_visualization.figure_ops.executor
 =========================================
 
 功能概述:
-    将已校验 FigurePlan 依次应用到同一个 PyGMT Figure，并通过共享上下文
-    传递区域、投影、CPT、图例和输出状态，同时保留链式 ``apply`` 接口。
+    将已校验 FigurePlan 的整图与 Panel 图层应用到同一个 PyGMT Figure，
+    通过受控上下文传递区域、投影、CPT、图例和输出状态。
 
 函数说明:
     ``RenderContext``:
@@ -22,7 +22,7 @@ from typing import Any
 
 from .cartography_operations import CARTOGRAPHY_HANDLERS
 from .direct_operations import DIRECT_HANDLERS
-from .model import FigureOperation, FigurePlan
+from .model import FigureOperation, FigurePlan, LayerOperation, PanelPlan
 
 
 @dataclass
@@ -34,11 +34,13 @@ class RenderContext:
     project: Mapping[str, str]
     figure_options: Mapping[str, str]
     resources: dict[str, dict[str, object]] = field(default_factory=dict)
+    figure_resources: dict[str, dict[str, object]] = field(default_factory=dict)
     legend_items: list[dict[str, object]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     region: tuple[float, float, float, float] | None = None
     projection: str | None = None
     active_cpt_source: str | None = None
+    panel_identifier: int | str | None = None
 
 
 Handler = Callable[[RenderContext, FigureOperation], None]
@@ -106,24 +108,81 @@ class FigureExecutor:
         handler(self._ensure_context(), operation)
         return self
 
-    def execute(self) -> "FigureExecutor":
-        """Validate terminal output placement and execute every operation in order."""
-        enabled_indices = [
-            index for index, operation in enumerate(self.plan.operations)
-            if operation.options.get("enabled", True) is not False
-        ]
-        save_indices = [
-            index for index, operation in enumerate(self.plan.operations)
-            if operation.handler == "savefig" and operation.options.get("enabled", True) is not False
-        ]
-        if save_indices and save_indices[-1] != enabled_indices[-1]:
-            section = self.plan.operations[save_indices[-1]].section
-            raise ValueError(f"[{section}] must be the last enabled figure operation")
-        if len(save_indices) > 1:
+    @staticmethod
+    def _enabled_layers(layers: tuple[LayerOperation, ...]) -> tuple[LayerOperation, ...]:
+        """Return enabled layers while preserving their configured order."""
+        return tuple(
+            layer
+            for layer in layers
+            if layer.options.get("enabled", True) is not False
+        )
+
+    def _all_layers(self) -> tuple[LayerOperation, ...]:
+        """Flatten the plan in execution order for terminal-layer validation."""
+        panel_layers = tuple(
+            layer for panel in self.plan.panels for layer in panel.layers
+        )
+        return self.plan.operations + panel_layers + self.plan.figure_layers
+
+    def _execute_panel(self, panel: PanelPlan) -> None:
+        """Execute one panel with isolated resources and panel-local map state."""
+        context = self._ensure_context()
+        set_panel = getattr(context.figure, "set_panel", None)
+        if set_panel is None:
+            raise TypeError("configured PanelPlan requires Figure.set_panel support")
+
+        previous_region = context.region
+        previous_projection = context.projection
+        previous_resources = context.resources
+        previous_cpt = context.active_cpt_source
+        previous_identifier = context.panel_identifier
+        context.region = panel.region
+        context.projection = panel.projection
+        context.resources = dict(context.figure_resources)
+        context.active_cpt_source = None
+        context.panel_identifier = panel.identifier
+        try:
+            with set_panel(panel=panel.identifier):
+                for layer in panel.layers:
+                    self.apply(layer)
+        finally:
+            context.region = previous_region
+            context.projection = previous_projection
+            context.resources = previous_resources
+            context.active_cpt_source = previous_cpt
+            context.panel_identifier = previous_identifier
+
+    def execute_plan(self, plan: FigurePlan | None = None) -> "FigureExecutor":
+        """Execute one complete figure plan and return this fluent executor."""
+        if plan is not None and plan is not self.plan:
+            self.plan = plan
+            self._context = None
+
+        all_layers = self._all_layers()
+        enabled_layers = self._enabled_layers(all_layers)
+        save_layers = tuple(
+            layer for layer in enabled_layers if layer.handler == "savefig"
+        )
+        if save_layers and save_layers[-1] is not enabled_layers[-1]:
+            raise ValueError(
+                f"[{save_layers[-1].section}] must be the last enabled figure operation"
+            )
+        if len(save_layers) > 1:
             raise ValueError("a figure plan may contain only one enabled figure.savefig operation")
-        for operation in self.plan.operations:
-            self.apply(operation)
+
+        for layer in self.plan.operations:
+            self.apply(layer)
+        if self._context is not None:
+            self._context.figure_resources = dict(self._context.resources)
+        for panel in self.plan.panels:
+            self._execute_panel(panel)
+        for layer in self.plan.figure_layers:
+            self.apply(layer)
         return self
+
+    def execute(self) -> "FigureExecutor":
+        """Execute the configured plan through the compatibility entry point."""
+        return self.execute_plan()
 
 
 __all__ = ["FigureExecutor", "RenderContext"]

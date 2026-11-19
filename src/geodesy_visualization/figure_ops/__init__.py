@@ -25,7 +25,7 @@ from .cartography_operations import (
     render_meca,
     render_regional_inset,
 )
-from .model import FigureOperation, FigurePlan
+from .model import FigureOperation, FigurePlan, LayerOperation, PanelPlan
 from .executor import FigureExecutor, RenderContext
 from .registry import DEFAULT_REGISTRY, OperationRegistry, OperationSpec
 
@@ -34,6 +34,8 @@ __all__ = [
     "FaultFeature",
     "FigureOperation",
     "FigurePlan",
+    "LayerOperation",
+    "PanelPlan",
     "FigureExecutor",
     "OperationRegistry",
     "OperationSpec",

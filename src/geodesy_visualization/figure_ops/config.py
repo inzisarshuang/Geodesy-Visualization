@@ -187,14 +187,6 @@ def load_figure_plan(
     ]
     if len(save_operations) != 1:
         raise ValueError("figure plan requires exactly one [figure.savefig] operation")
-    processing_root = project.get("processing_root")
-    if processing_root:
-        output = Path(str(save_operations[0].options["fname"]))
-        if not output.is_relative_to(Path(processing_root)):
-            raise ValueError(
-                "[figure.savefig] fname must remain inside [project] processing_root"
-            )
-
     return FigurePlan(
         config_path=path,
         project=MappingProxyType(project),

@@ -264,8 +264,8 @@ class FigureOperationConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(FileNotFoundError, r"figure\.grdimage\.dem.*grid"):
                 load_figure_plan(cfg)
 
-    def test_rejects_output_outside_processing_root(self) -> None:
-        """Keep configured publication output inside the declared project root."""
+    def test_accepts_explicit_output_outside_processing_root(self) -> None:
+        """Allow a post-processing figure to target any explicit publication path."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "project").mkdir()
@@ -280,8 +280,12 @@ class FigureOperationConfigTests(unittest.TestCase):
                 fname = escaped.png
                 """,
             )
-            with self.assertRaisesRegex(ValueError, r"figure\.savefig.*processing_root"):
-                load_figure_plan(cfg)
+            plan = load_figure_plan(cfg)
+
+            self.assertEqual(
+                plan.operations[-1].options["fname"],
+                str((root / "escaped.png").resolve()),
+            )
 
     def test_rejects_unknown_layout_and_missing_savefig(self) -> None:
         """Require one supported layout and one publication operation."""

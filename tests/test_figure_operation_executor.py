@@ -10,7 +10,12 @@ from types import MappingProxyType
 from unittest.mock import patch
 
 from geodesy_visualization.figure_ops.executor import FigureExecutor
-from geodesy_visualization.figure_ops.model import FigureOperation, FigurePlan
+from geodesy_visualization.figure_ops.model import (
+    FigureOperation,
+    FigurePlan,
+    LayerOperation,
+    PanelPlan,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +28,13 @@ class RecordingFigure:
     def __init__(self) -> None:
         """Initialize an empty ordered call list."""
         self.calls: list[tuple[str, dict]] = []
+
+    @contextmanager
+    def set_panel(self, panel) -> None:
+        """Record entry and exit around one subplot panel scope."""
+        self.calls.append(("panel_enter", {"panel": panel}))
+        yield
+        self.calls.append(("panel_exit", {"panel": panel}))
 
     def basemap(self, **kwargs) -> None:
         """Record one basemap call."""
@@ -69,8 +81,9 @@ class RecordingFigure:
         self.calls.append(("legend", {"spec_content": content, **kwargs}))
 
     def savefig(self, fname, **kwargs) -> None:
-        """Record one output call without writing a file."""
+        """Record one output call and publish a small valid test artifact."""
         self.calls.append(("savefig", {"fname": fname, **kwargs}))
+        Path(fname).write_bytes(b"test-figure")
 
 
 class LegacyRecordingFigure:
@@ -169,6 +182,131 @@ class FigureOperationExecutorTests(unittest.TestCase):
             self.assertEqual(figure.calls[1][1]["region"], (102.0, 103.6, 35.2, 36.5))
             self.assertEqual(figure.calls[1][1]["projection"], "M8i")
             self.assertIs(figure.calls[2][1]["cmap"], True)
+
+    def test_executes_panel_layers_inside_their_named_scopes(self) -> None:
+        """Catch layers rendered outside their configured subplot panel."""
+        first = operation(
+            "figure.plot.first",
+            "record_panel",
+            {},
+            0,
+        )
+        second = operation(
+            "figure.plot.second",
+            "record_panel",
+            {},
+            1,
+        )
+        figure = RecordingFigure()
+        observed: list[tuple[str, object, object]] = []
+
+        def record_panel(context, layer) -> None:
+            """Record the active panel identity, region, and projection."""
+            observed.append((layer.section, context.region, context.projection))
+
+        configured = FigurePlan(
+            config_path=Path("/tmp/panels.cfg"),
+            project=MappingProxyType({}),
+            figure=MappingProxyType({"layout": "subplot"}),
+            operations=(),
+            panels=(
+                PanelPlan("upper", (0.0, 1.0, 2.0, 3.0), "M8c", (first,)),
+                PanelPlan("lower", (4.0, 5.0, 6.0, 7.0), "M6c", (second,)),
+            ),
+        )
+
+        executor = FigureExecutor(
+            configured,
+            figure_factory=lambda: figure,
+            handlers={"record_panel": record_panel},
+        ).execute_plan()
+
+        self.assertIsInstance(first, LayerOperation)
+        self.assertEqual(
+            [name for name, _ in figure.calls],
+            ["panel_enter", "panel_exit", "panel_enter", "panel_exit"],
+        )
+        self.assertEqual(
+            observed,
+            [
+                ("figure.plot.first", (0.0, 1.0, 2.0, 3.0), "M8c"),
+                ("figure.plot.second", (4.0, 5.0, 6.0, 7.0), "M6c"),
+            ],
+        )
+        self.assertIs(executor.execute_plan(), executor)
+
+    def test_panel_resources_do_not_leak_into_the_next_panel(self) -> None:
+        """Catch one panel accidentally consuming another panel's prepared raster."""
+        figure = RecordingFigure()
+        observed: list[set[str]] = []
+
+        def publish(context, layer) -> None:
+            """Publish a resource in the active panel only."""
+            context.resources[layer.section] = {"value": "panel-only"}
+
+        def inspect(context, layer) -> None:
+            """Capture the resources visible to the next panel."""
+            observed.append(set(context.resources))
+
+        configured = FigurePlan(
+            config_path=Path("/tmp/resources.cfg"),
+            project=MappingProxyType({}),
+            figure=MappingProxyType({"layout": "subplot"}),
+            operations=(),
+            panels=(
+                PanelPlan(
+                    0,
+                    None,
+                    None,
+                    (operation("figure.plot.source", "publish", {}, 0),),
+                ),
+                PanelPlan(
+                    1,
+                    None,
+                    None,
+                    (operation("figure.plot.consumer", "inspect", {}, 1),),
+                ),
+            ),
+        )
+
+        FigureExecutor(
+            configured,
+            figure_factory=lambda: figure,
+            handlers={"publish": publish, "inspect": inspect},
+        ).execute_plan()
+
+        self.assertEqual(observed, [set()])
+
+    def test_failed_atomic_save_preserves_existing_output_and_removes_temporary(self) -> None:
+        """Catch a failed PyGMT export replacing a valid existing figure."""
+        class FailingFigure(RecordingFigure):
+            """Write a partial temporary artifact and fail during publication."""
+
+            def savefig(self, fname, **kwargs) -> None:
+                """Simulate a renderer failure after creating partial output."""
+                Path(fname).write_bytes(b"partial")
+                raise RuntimeError("simulated export failure")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "figure.png"
+            output.write_bytes(b"previous-valid-figure")
+            configured = plan(
+                operation(
+                    "figure.savefig",
+                    "savefig",
+                    {"fname": str(output), "dpi": 300},
+                    0,
+                )
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "simulated export failure"):
+                FigureExecutor(
+                    configured,
+                    figure_factory=FailingFigure,
+                ).execute_plan()
+
+            self.assertEqual(output.read_bytes(), b"previous-valid-figure")
+            self.assertEqual(list(output.parent.glob(".figure.*.png")), [])
 
     def test_grdimage_series_builds_one_shared_cpt(self) -> None:
         """Use one explicit CPT range for both raster colors and its colorbar."""

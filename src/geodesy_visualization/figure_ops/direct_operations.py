@@ -19,6 +19,8 @@ geodesy_visualization.figure_ops.direct_operations
 
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
@@ -243,14 +245,29 @@ def render_colorbar(context: "RenderContext", operation: "FigureOperation") -> N
 
 
 def render_savefig(context: "RenderContext", operation: "FigureOperation") -> None:
-    """Create the destination directory and save the configured Figure output."""
+    """Atomically replace the output after a complete non-empty figure save."""
     options = dict(operation.options)
     output = Path(str(options.pop("fname"))).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     canvas_margin = options.pop("canvas_margin", None)
     if canvas_margin:
         options["resize"] = f"+m{canvas_margin}"
-    context.figure.savefig(str(output), **options)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{output.stem}.",
+        suffix=output.suffix,
+        dir=output.parent,
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    temporary.unlink()
+    try:
+        context.figure.savefig(str(temporary), **options)
+        if not temporary.is_file() or temporary.stat().st_size == 0:
+            raise RuntimeError(f"figure save produced no non-empty output: {output}")
+        os.replace(temporary, output)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
     context.resources[operation.section] = {"output": str(output)}
 
 
