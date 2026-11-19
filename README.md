@@ -228,14 +228,12 @@ conda activate envPlot
 python -m pip install -e '.[all]'
 ```
 
-An Analysis environment that only consumes the Matplotlib backend can avoid
-GMT, PyGMT, and Rasterio dependencies:
+Analysis and Visualization remain separate environments. Analysis runs in
+`envInSAR`; all plotting backends, including Matplotlib-only workflows, are
+installed and executed in `envPlot`.
 
-只使用 Matplotlib 后端的 Analysis 环境无需安装 GMT、PyGMT 或 Rasterio：
-
-```bash
-python -m pip install -e '../Geodesy-Visualization[matplotlib]'
-```
+Analysis 与 Visualization 保持环境隔离：Analysis 在 `envInSAR` 中运行；包括
+Matplotlib-only 工作流在内的所有绘图后端均安装并运行于 `envPlot`。
 
 PyGMT `0.10.0` is the verified server version. Later compatible versions may be used after running the repository tests and both example workflows.
 
@@ -254,6 +252,28 @@ gdal_translate --version
 Paths inside a cfg file are resolved from the declared project context rather than the shell's current directory. An explicit `output_dir` remains authoritative; otherwise `project_root`, `project`, and `processing_root` derive `FIGURES/PUBLICATION/<WORKFLOW>`.
 
 cfg 中的路径按声明的项目上下文解析，而不是终端当前目录；显式 `output_dir` 优先，否则由项目、case 和方法根自动生成 `FIGURES/PUBLICATION/<WORKFLOW>`。
+
+Every workflow accepts exactly one configuration source: `--config` for one
+figure job or `--list` for a repeatable batch. A list contains one cfg path per
+line; blank lines and lines beginning with `#` are ignored, and relative paths
+are resolved from the list file. Jobs continue after an independent failure and
+the command prints a final success/failure summary.
+
+每个工作流只接受一种配置来源：单个图件使用 `--config`，可重复批处理使用
+`--list`。列表每行填写一个 cfg 路径；空行和以 `#` 开头的注释会被忽略，
+相对路径以列表文件所在目录为基准解析。某个独立任务失败后仍继续后续任务，
+最后统一输出成功和失败汇总。
+
+```text
+# publication_jobs.list
+study_area_reference.cfg
+study_area_secondary.cfg
+```
+
+```bash
+conda run -n envPlot geodesy-visualization study-area \
+  --list publication_jobs.list
+```
 
 ### 5.1 Study Area And Data Footprints / 研究区与数据 Footprint
 
