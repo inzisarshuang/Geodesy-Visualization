@@ -36,6 +36,13 @@ class RecordingFigure:
         yield
         self.calls.append(("panel_exit", {"panel": panel}))
 
+    @contextmanager
+    def subplot(self, **kwargs) -> None:
+        """Record entry and exit around one multi-panel figure scope."""
+        self.calls.append(("subplot_enter", kwargs))
+        yield
+        self.calls.append(("subplot_exit", {}))
+
     def basemap(self, **kwargs) -> None:
         """Record one basemap call."""
         self.calls.append(("basemap", kwargs))
@@ -276,6 +283,42 @@ class FigureOperationExecutorTests(unittest.TestCase):
         ).execute_plan()
 
         self.assertEqual(observed, [set()])
+
+    def test_subplot_scope_wraps_all_panel_scopes_once(self) -> None:
+        """Catch panel selection occurring outside the owning subplot context."""
+        figure = RecordingFigure()
+        configured = FigurePlan(
+            config_path=Path("/tmp/subplot.cfg"),
+            project=MappingProxyType({}),
+            figure=MappingProxyType(
+                {
+                    "layout": "subplot",
+                    "subplot": {"nrows": 1, "ncols": 2, "subsize": ("4c", "3c")},
+                }
+            ),
+            panels=(
+                PanelPlan(0, None, None, ()),
+                PanelPlan(1, None, None, ()),
+            ),
+        )
+
+        FigureExecutor(configured, figure_factory=lambda: figure).execute_plan()
+
+        self.assertEqual(
+            [name for name, _ in figure.calls],
+            [
+                "subplot_enter",
+                "panel_enter",
+                "panel_exit",
+                "panel_enter",
+                "panel_exit",
+                "subplot_exit",
+            ],
+        )
+        self.assertEqual(
+            figure.calls[0][1],
+            {"nrows": 1, "ncols": 2, "subsize": ("4c", "3c")},
+        )
 
     def test_failed_atomic_save_preserves_existing_output_and_removes_temporary(self) -> None:
         """Catch a failed PyGMT export replacing a valid existing figure."""

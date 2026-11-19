@@ -32,7 +32,7 @@ class RenderContext:
     figure: object
     config_path: Path
     project: Mapping[str, str]
-    figure_options: Mapping[str, str]
+    figure_options: Mapping[str, object]
     resources: dict[str, dict[str, object]] = field(default_factory=dict)
     figure_resources: dict[str, dict[str, object]] = field(default_factory=dict)
     legend_items: list[dict[str, object]] = field(default_factory=list)
@@ -152,6 +152,23 @@ class FigureExecutor:
             context.active_cpt_source = previous_cpt
             context.panel_identifier = previous_identifier
 
+    def _execute_panels(self) -> None:
+        """Execute all panels inside one optional owning subplot scope."""
+        if not self.plan.panels:
+            return
+        subplot_options = self.plan.figure.get("subplot")
+        if subplot_options is None:
+            for panel in self.plan.panels:
+                self._execute_panel(panel)
+            return
+        context = self._ensure_context()
+        subplot = getattr(context.figure, "subplot", None)
+        if subplot is None:
+            raise TypeError("subplot FigurePlan requires Figure.subplot support")
+        with subplot(**dict(subplot_options)):
+            for panel in self.plan.panels:
+                self._execute_panel(panel)
+
     def execute_plan(self, plan: FigurePlan | None = None) -> "FigureExecutor":
         """Execute one complete figure plan and return this fluent executor."""
         if plan is not None and plan is not self.plan:
@@ -174,8 +191,7 @@ class FigureExecutor:
             self.apply(layer)
         if self._context is not None:
             self._context.figure_resources = dict(self._context.resources)
-        for panel in self.plan.panels:
-            self._execute_panel(panel)
+        self._execute_panels()
         for layer in self.plan.figure_layers:
             self.apply(layer)
         return self

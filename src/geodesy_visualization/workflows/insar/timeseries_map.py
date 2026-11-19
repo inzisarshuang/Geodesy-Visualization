@@ -11,6 +11,7 @@ geodesy_visualization.workflows.insar.timeseries_map
     ``build_parser``: 构建 cfg 命令行入口。
     ``load_config``: 读取并校验空间时序图配置。
     ``load_timeseries_table``: 分块读取坐标和所选时序列。
+    ``compile_timeseries_map``: 将所选时期编译为共享 CPT 的 PanelPlan。
     ``draw_panel_basemap``: 绘制空白、DEM 或光学底图。
     ``render``: 组合时序子图并安全保存。
     ``main``: 执行配置加载、数据读取和绘图。
@@ -54,6 +55,11 @@ from geodesy_visualization.styles import (
     resolve_cpt_reference,
 )
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
+from geodesy_visualization.figure_ops.executor import FigureExecutor
+from geodesy_visualization.figure_ops.timeseries_layers import TIMESERIES_HANDLERS
+from geodesy_visualization.workflows.insar.timeseries_map_plan import (
+    compile_timeseries_map,
+)
 
 
 DEFAULT_CONFIG = resource_path(
@@ -119,6 +125,8 @@ def load_config(config_file: str) -> dict[str, object]:
     if not dates_value:
         raise ValueError("dates_file is required for the visualization exchange table")
     cfg = {
+        "config_path": str(path),
+        "output_dir": output_dir,
         "data_source": data_source,
         "render_mode": render_mode,
         "data_file": resolve_path(get_required(raw, "data_file"), base),
@@ -566,24 +574,41 @@ def _render_panels(
 
 
 def main(arguments: Sequence[str] | None = None) -> None:
-    """Load one cfg, read the selected epochs and render the time-series map."""
+    """Load selected epochs, compile their panel plan, and execute one figure."""
     args = build_parser().parse_args(arguments)
     cfg = load_config(args.config)
     if args.dry_run:
-        print(f"dry-run: output={cfg['output']}")
+        date_table = pd.read_csv(str(cfg["dates_file"]), sep=r"\s+", dtype=str)
+        selected_dates = date_table["date_yyyymmdd"].tolist()[
+            int(cfg["start_epoch"]) - 1 : int(cfg["end_epoch"])
+        ]
+        empty = np.empty((0,), dtype=float)
+        epochs = (
+            empty,
+            empty,
+            np.empty((0, len(selected_dates)), dtype=float),
+            selected_dates,
+        )
+        plan = compile_timeseries_map(cfg, epochs)
+        print(f"Panels: {len(plan.panels)}")
+        for panel in plan.panels:
+            print(f"  Panel {panel.identifier}: {panel.layers[-1].options['date']}")
+        print(f"Output: {plan.figure_layers[-1].options['fname']}")
         return
     data = load_timeseries_table(
         str(cfg["data_file"]), str(cfg["dates_file"]), int(cfg["start_epoch"]),
         int(cfg["end_epoch"]), float(cfg["scale"]), int(cfg["chunk_rows"]),
         list(cfg["nan_tokens"]),
     )
-    destination = render(cfg, *data)
-    print(f"Saved: {destination}")
+    plan = compile_timeseries_map(cfg, data)
+    FigureExecutor(plan, handlers=TIMESERIES_HANDLERS).execute_plan()
+    print(f"Saved: {cfg['output']}")
 
 
 __all__ = [
     "ALLOWED_KEYS",
     "build_parser",
+    "compile_timeseries_map",
     "draw_panel_basemap",
     "load_config",
     "load_timeseries_table",

@@ -53,7 +53,7 @@ class FigurePlan:
 
     config_path: Path
     project: Mapping[str, str]
-    figure: Mapping[str, str]
+    figure: Mapping[str, object]
     operations: tuple[LayerOperation, ...] = ()
     panels: tuple[PanelPlan, ...] = ()
     figure_layers: tuple[LayerOperation, ...] = ()
