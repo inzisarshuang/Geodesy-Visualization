@@ -24,6 +24,8 @@ geodesy_visualization.workflows.insar.deformation_profile
         生成指定轨迹和绘图模式的输出路径。
     ``render_profiles``:
         为每条轨迹绘制折线和散点剖面对比图。
+    ``compile_profile_figures``:
+        将地图、轨迹和剖面结果编译为统一图层计划。
     ``main``:
         准备网格、提取剖面并执行全部地图和剖面绘图流程。
 """
@@ -63,7 +65,13 @@ from geodesy_visualization.styles import (
     resolve_cpt_reference,
 )
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
+from geodesy_visualization.figure_ops.deformation_layers import DEFORMATION_HANDLERS
+from geodesy_visualization.figure_ops.executor import FigureExecutor
+from geodesy_visualization.figure_ops.profile_layers import PROFILE_HANDLERS
 from geodesy_visualization.resources import resource_path
+from geodesy_visualization.workflows.insar.deformation_profile_plan import (
+    compile_profile_figures,
+)
 
 
 cpt_path = resource_path("cpt")
@@ -189,6 +197,7 @@ def load_config(config_path: str) -> dict:
         raise ValueError("marker_lon and marker_lat must be provided together.")
 
     conf = {
+        "config_path": str(cfg_path),
         "projection": get_optional(cfg, "projection", "M8i"),
         "dem_tif": resolve_path(get_required(cfg, "dem_tif"), base_dir),
         "dem_cpt": get_optional(cfg, "dem_cpt", "gray"),
@@ -417,33 +426,37 @@ def render_profiles(plotter: PyGMTPlotter, cfg: dict, dataset_cfgs: list[dict], 
 
 
 def main(arguments: Sequence[str] | None = None) -> None:
-    """Prepare both grids, extract common profiles, and render all configured figures."""
+    """Prepare grids, sample profiles, compile plans, and execute all figures."""
     args = build_parser().parse_args(arguments)
     cfg = load_config(args.config)
+    tracks = build_tracks(cfg)
     if args.dry_run:
-        print(f"dry-run: output_dir={cfg['output_dir']}")
+        placeholder = {
+            name: ((), ())
+            for name in tracks
+        }
+        for plan in compile_profile_figures(cfg, tracks, placeholder):
+            print(f"Figure: {plan.figure['dataset']}")
+            for layer in plan.operations:
+                print(f"  {layer.order + 1:02d}. {layer.section}")
+            print(f"Output: {plan.operations[-1].options['fname']}")
         return
 
     dataset_cfgs = [cfg["dataset1"], cfg["dataset2"]]
     for dataset_cfg in dataset_cfgs:
         prepare_dataset_grid(dataset_cfg)
 
-    tracks = build_tracks(cfg)
     profiles = extract_profiles(dataset_cfgs, tracks)
-
-    map_plotter = PyGMTPlotter(defaults={**cfg["default_style"], **cfg["map_style"]})
-
-    for dataset_cfg in dataset_cfgs:
-        render_map(map_plotter, cfg, dataset_cfg, tracks)
-
-    profile_plotter = PyGMTPlotter(defaults={**cfg["default_style"], **cfg["profile_style"]})
-    render_profiles(profile_plotter, cfg, dataset_cfgs, profiles)
+    handlers = {**DEFORMATION_HANDLERS, **PROFILE_HANDLERS}
+    for plan in compile_profile_figures(cfg, tracks, profiles):
+        FigureExecutor(plan, handlers=handlers).execute_plan()
 
 
 __all__ = [
     "ALLOWED_KEYS",
     "build_parser",
     "build_tracks",
+    "compile_profile_figures",
     "extract_profiles",
     "load_config",
     "load_dataset_cfg",
