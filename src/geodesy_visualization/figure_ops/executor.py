@@ -127,10 +127,6 @@ class FigureExecutor:
     def _execute_panel(self, panel: PanelPlan) -> None:
         """Execute one panel with isolated resources and panel-local map state."""
         context = self._ensure_context()
-        set_panel = getattr(context.figure, "set_panel", None)
-        if set_panel is None:
-            raise TypeError("configured PanelPlan requires Figure.set_panel support")
-
         previous_region = context.region
         previous_projection = context.projection
         previous_resources = context.resources
@@ -142,9 +138,18 @@ class FigureExecutor:
         context.active_cpt_source = None
         context.panel_identifier = panel.identifier
         try:
-            with set_panel(panel=panel.identifier):
+            if self.plan.figure.get("layout") == "cartesian":
                 for layer in panel.layers:
                     self.apply(layer)
+            else:
+                set_panel = getattr(context.figure, "set_panel", None)
+                if set_panel is None:
+                    raise TypeError(
+                        "configured PanelPlan requires Figure.set_panel support"
+                    )
+                with set_panel(panel=panel.identifier):
+                    for layer in panel.layers:
+                        self.apply(layer)
         finally:
             context.region = previous_region
             context.projection = previous_projection

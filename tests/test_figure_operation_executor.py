@@ -320,6 +320,38 @@ class FigureOperationExecutorTests(unittest.TestCase):
             {"nrows": 1, "ncols": 2, "subsize": ("4c", "3c")},
         )
 
+    def test_single_cartesian_panel_executes_without_subplot_selection(self) -> None:
+        """Catch a direct Cartesian figure incorrectly requiring Figure.set_panel."""
+        figure = RecordingFigure()
+        observed: list[str] = []
+
+        def record(context, layer) -> None:
+            """Record the direct panel layer without drawing."""
+            observed.append(layer.section)
+
+        configured = FigurePlan(
+            config_path=Path("/tmp/cartesian.cfg"),
+            project=MappingProxyType({}),
+            figure=MappingProxyType({"layout": "cartesian"}),
+            panels=(
+                PanelPlan(
+                    "main",
+                    None,
+                    "X16c/5c",
+                    (operation("figure.plot.series", "record", {}, 0),),
+                ),
+            ),
+        )
+
+        FigureExecutor(
+            configured,
+            figure_factory=lambda: figure,
+            handlers={"record": record},
+        ).execute_plan()
+
+        self.assertEqual(observed, ["figure.plot.series"])
+        self.assertEqual(figure.calls, [])
+
     def test_failed_atomic_save_preserves_existing_output_and_removes_temporary(self) -> None:
         """Catch a failed PyGMT export replacing a valid existing figure."""
         class FailingFigure(RecordingFigure):

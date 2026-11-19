@@ -9,8 +9,9 @@ geodesy_visualization.workflows.insar.timeseries_aux
     ``build_parser``: 构建 cfg 命令行入口。
     ``load_config``: 读取并校验组合时序图配置。
     ``read_date_value_table``: 严格读取两列日期-数值文本。
+    ``load_series``: 读取配置指定的四套日期序列。
     ``render``: 绘制多纵轴时序图并安全保存。
-    ``main``: 执行配置加载、数据读取和绘图。
+    ``main``: 编译 FigurePlan 并通过共享执行器绘图。
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from geodesy_visualization.io import (
     get_optional,
     get_required,
     load_key_value_config,
+    parse_bool,
     parse_float,
     resolve_output_path,
     resolve_publication_output_dir,
@@ -37,6 +39,11 @@ from geodesy_visualization.io import (
 from geodesy_visualization.resources import resource_path
 from geodesy_visualization.styles import font_style_keys, parse_font_style
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
+from geodesy_visualization.figure_ops.executor import FigureExecutor
+from geodesy_visualization.figure_ops.timeseries_layers import TIMESERIES_HANDLERS
+from geodesy_visualization.workflows.insar.timeseries_aux_plan import (
+    compile_aux_timeseries,
+)
 
 
 DEFAULT_CONFIG = resource_path(
@@ -54,6 +61,9 @@ ALLOWED_KEYS = {
     "x_primary_frame", "x_secondary_frame", "defo_y_frame", "precip_y_frame",
     "temperature_y_frame", "primary_time_font", "secondary_tick_length",
     "secondary_annot_offset",
+    "add_legend", "legend_position", "legend_box",
+    "defo_legend_label", "fit_legend_label",
+    "precip_legend_label", "temperature_legend_label",
 }
 ALLOWED_KEYS.update(font_style_keys("default"))
 
@@ -80,6 +90,8 @@ def load_config(config_file: str) -> dict[str, object]:
         resolve_publication_output_dir(raw, path, "timeseries_aux")
     )
     cfg = {
+        "config_path": str(path),
+        "output_dir": output_dir,
         "deformation_file": resolve_path(get_required(raw, "deformation_file"), base),
         "fit_file": resolve_path(get_required(raw, "fit_file"), base),
         "precipitation_file": resolve_path(get_required(raw, "precipitation_file"), base),
@@ -124,6 +136,19 @@ def load_config(config_file: str) -> dict[str, object]:
         "primary_time_font": get_optional(raw, "primary_time_font", "6p,TeX Gyre Heros"),
         "secondary_tick_length": get_optional(raw, "secondary_tick_length", "0p"),
         "secondary_annot_offset": get_optional(raw, "secondary_annot_offset", "18p"),
+        "add_legend": parse_bool(get_optional(raw, "add_legend", "false")),
+        "legend_position": get_optional(raw, "legend_position", "JTR+o0.2c/0.2c"),
+        "legend_box": get_optional(raw, "legend_box", "+gwhite+p0.8p"),
+        "defo_legend_label": get_optional(raw, "defo_legend_label", "Deformation"),
+        "fit_legend_label": get_optional(
+            raw, "fit_legend_label", "Fitted deformation"
+        ),
+        "precip_legend_label": get_optional(
+            raw, "precip_legend_label", "Precipitation"
+        ),
+        "temperature_legend_label": get_optional(
+            raw, "temperature_legend_label", "Temperature"
+        ),
         "defaults": {
             **parse_font_style(
                 raw,
@@ -170,6 +195,24 @@ def read_date_value_table(path: str, value_column: str) -> pd.DataFrame:
     if table["date"].duplicated().any():
         raise ValueError(f"date-value table contains duplicate dates: {path}")
     return table.sort_values("date")
+
+
+def load_series(cfg: dict[str, object]) -> dict[str, pd.DataFrame]:
+    """Load the four named date/value tables required by one auxiliary plot."""
+    return {
+        "deformation": read_date_value_table(
+            str(cfg["deformation_file"]), "deformation_mm"
+        ),
+        "fit": read_date_value_table(
+            str(cfg["fit_file"]), "fitted_deformation_mm"
+        ),
+        "precipitation": read_date_value_table(
+            str(cfg["precipitation_file"]), "precipitation_mm_per_day"
+        ),
+        "temperature": read_date_value_table(
+            str(cfg["temperature_file"]), "temperature_celsius"
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -273,33 +316,25 @@ def render(cfg: dict[str, object], series: dict[str, pd.DataFrame]) -> Path:
 
 
 def main(arguments: Sequence[str] | None = None) -> None:
-    """Load one cfg and render the four configured date-value series."""
+    """Compile one cfg and execute its ordered auxiliary time-series layers."""
     args = build_parser().parse_args(arguments)
     cfg = load_config(args.config)
+    series = load_series(cfg)
+    plan = compile_aux_timeseries(cfg, series)
     if args.dry_run:
-        print(f"dry-run: output={cfg['output']}")
+        sections = [layer.section for layer in plan.panels[0].layers]
+        print(f"dry-run: layers={sections} output={cfg['output']}")
         return
-    series = {
-        "deformation": read_date_value_table(
-            str(cfg["deformation_file"]), "deformation_mm"
-        ),
-        "fit": read_date_value_table(
-            str(cfg["fit_file"]), "fitted_deformation_mm"
-        ),
-        "precipitation": read_date_value_table(
-            str(cfg["precipitation_file"]), "precipitation_mm_per_day"
-        ),
-        "temperature": read_date_value_table(
-            str(cfg["temperature_file"]), "temperature_celsius"
-        ),
-    }
-    print(f"Saved: {render(cfg, series)}")
+    FigureExecutor(plan, handlers=TIMESERIES_HANDLERS).execute_plan()
+    print(f"Saved: {cfg['output']}")
 
 
 __all__ = [
     "ALLOWED_KEYS",
     "build_parser",
+    "compile_aux_timeseries",
     "load_config",
+    "load_series",
     "main",
     "read_date_value_table",
     "render",

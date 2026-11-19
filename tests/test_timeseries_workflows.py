@@ -14,6 +14,9 @@ from geodesy_visualization.workflows.insar import timeseries_map as spatial
 from geodesy_visualization.workflows.insar.timeseries_map_plan import (
     compile_timeseries_map,
 )
+from geodesy_visualization.workflows.insar.timeseries_aux_plan import (
+    compile_aux_timeseries,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -187,6 +190,58 @@ class AuxiliaryTimeSeriesTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "duplicate"):
                 auxiliary.read_date_value_table(str(table), "deformation_mm")
+
+    def test_compiles_three_axes_and_four_series_in_visible_order(self) -> None:
+        """Catch changed axis ownership, time frames, styles, labels, or output."""
+        cfg = auxiliary.load_config(str(auxiliary.DEFAULT_CONFIG))
+        series = auxiliary.load_series(cfg)
+
+        plan = compile_aux_timeseries(cfg, series)
+
+        self.assertEqual(len(plan.panels), 1)
+        panel = plan.panels[0]
+        self.assertEqual(panel.identifier, "main")
+        self.assertEqual(
+            [layer.handler for layer in panel.layers],
+            [
+                "aux_axis",
+                "aux_series",
+                "aux_axis",
+                "aux_series",
+                "aux_axis",
+                "aux_axis",
+                "aux_series",
+                "aux_series",
+                "aux_legend",
+            ],
+        )
+        self.assertEqual(panel.layers[0].options["range"], tuple(cfg["temperature_range"]))
+        self.assertEqual(panel.layers[2].options["range"], tuple(cfg["precip_range"]))
+        self.assertEqual(panel.layers[4].options["range"], tuple(cfg["defo_range"]))
+        self.assertEqual(panel.layers[4].options["frame"], cfg["x_primary_frame"])
+        self.assertEqual(panel.layers[5].options["frame"], cfg["x_secondary_frame"])
+        self.assertEqual(panel.layers[6].options["style"], cfg["defo_symbol"])
+        self.assertEqual(panel.layers[7].options["pen"], cfg["fit_pen"])
+        self.assertEqual(panel.layers[1].options["label"], cfg["temperature_legend_label"])
+        self.assertEqual(panel.layers[3].options["label"], cfg["precip_legend_label"])
+        self.assertEqual(plan.figure_layers[-1].options["fname"], cfg["output"])
+
+    def test_aux_main_loads_series_then_executes_compiled_plan(self) -> None:
+        """Catch auxiliary rendering bypassing the shared FigureExecutor."""
+        cfg = {"output": "/tmp/aux.png"}
+        series = {"deformation": MagicMock()}
+        plan = MagicMock()
+        executor = MagicMock()
+        with (
+            patch.object(auxiliary, "load_config", return_value=cfg),
+            patch.object(auxiliary, "load_series", return_value=series),
+            patch.object(auxiliary, "compile_aux_timeseries", return_value=plan) as compile_plan,
+            patch.object(auxiliary, "FigureExecutor", return_value=executor),
+        ):
+            auxiliary.main(["--config", "/tmp/aux.cfg"])
+
+        compile_plan.assert_called_once_with(cfg, series)
+        executor.execute_plan.assert_called_once_with()
 
 
 if __name__ == "__main__":
