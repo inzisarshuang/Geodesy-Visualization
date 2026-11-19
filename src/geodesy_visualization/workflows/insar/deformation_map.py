@@ -34,6 +34,8 @@ geodesy_visualization.workflows.insar.deformation_map
         组合并保存一个数据集的完整形变地图。
     ``render_coverage_map``:
         仅绘制光学底图、KML 覆盖边界和 GNSS 测站。
+    ``compile_deformation_maps``:
+        将紧凑工作流配置编译为与 footprint 一致的有序图层计划。
     ``main``:
         准备启用的数据网格并依次执行地图绘制流程。
 """
@@ -77,6 +79,11 @@ from geodesy_visualization.styles import (
     resolve_cpt_reference,
 )
 from geodesy_visualization.backends.pygmt import PyGMTPlotter
+from geodesy_visualization.figure_ops.deformation_layers import DEFORMATION_HANDLERS
+from geodesy_visualization.figure_ops.executor import FigureExecutor
+from geodesy_visualization.workflows.insar.deformation_map_plan import (
+    compile_deformation_maps,
+)
 
 
 DEFAULT_CONFIG = resource_path(
@@ -291,6 +298,7 @@ def load_config(config_path: str) -> dict:
             base_dir,
         )
         conf = {
+            "config_path": str(cfg_path),
             "map_mode": map_mode,
             "projection": get_optional(cfg, "projection", "M8i"),
             "region": parse_manual_region(cfg),
@@ -403,6 +411,8 @@ def load_config(config_path: str) -> dict:
         raise ValueError("optic_tif is required when any basemap mode is 'optic'.")
 
     conf = {
+        "config_path": str(cfg_path),
+        "output_dir": output_dir,
         "map_mode": map_mode,
         "projection": get_optional(cfg, "projection", "M8i"),
         "region": parse_manual_region(cfg),
@@ -693,15 +703,20 @@ def render_map(plotter: PyGMTPlotter, cfg: dict, dataset_cfg: dict) -> None:
 
 
 def main(arguments: Sequence[str] | None = None) -> None:
-    """Run grid preparation and render all datasets enabled by the selected cfg file."""
+    """Prepare enabled grids, compile layer plans, and execute every requested map."""
     args = build_parser().parse_args(arguments)
     cfg = load_config(args.config)
     if args.dry_run:
-        print(f"dry-run: output_dir={cfg['output_dir']}")
+        for plan in compile_deformation_maps(cfg):
+            print(f"Config: {plan.config_path}")
+            print(f"Dataset: {plan.figure['dataset']}")
+            for layer in plan.operations:
+                print(f"  {layer.order + 1:02d}. {layer.section}")
+            print(f"Output: {plan.operations[-1].options['fname']}")
         return
     if cfg["map_mode"] == "coverage":
-        map_style = {**cfg["default_style"], **cfg["map_style"]}
-        render_coverage_map(PyGMTPlotter(defaults=map_style), cfg)
+        for plan in compile_deformation_maps(cfg):
+            FigureExecutor(plan, handlers=DEFORMATION_HANDLERS).execute_plan()
         return
 
     from geodesy_visualization.grid_preparation import prepare_dataset_grid
@@ -710,16 +725,14 @@ def main(arguments: Sequence[str] | None = None) -> None:
     if cfg["psi"] is not None:
         prepare_dataset_grid(cfg["psi"])
 
-    map_style = {**cfg["default_style"], **cfg["map_style"]}
-    plotter = PyGMTPlotter(defaults=map_style)
-    render_map(plotter, cfg, cfg["sbas"])
-    if cfg["psi"] is not None:
-        render_map(plotter, cfg, cfg["psi"])
+    for plan in compile_deformation_maps(cfg):
+        FigureExecutor(plan, handlers=DEFORMATION_HANDLERS).execute_plan()
 
 
 __all__ = [
     "ALLOWED_KEYS",
     "build_parser",
+    "compile_deformation_maps",
     "draw_basemap",
     "draw_deformation",
     "draw_target_regions",
