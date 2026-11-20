@@ -18,12 +18,8 @@ geodesy_visualization.workflows.insar.deformation_profile
         根据配置中的起止坐标生成命名剖面轨迹。
     ``extract_profiles``:
         沿每条公共轨迹采样全部形变数据集。
-    ``render_map``:
-        绘制并保存包含 DEM、形变、轨迹和标记点的地图。
     ``profile_output_path``:
         生成指定轨迹和绘图模式的输出路径。
-    ``render_profiles``:
-        为每条轨迹绘制折线和散点剖面对比图。
     ``compile_profile_figures``:
         将地图、轨迹和剖面结果编译为统一图层计划。
     ``main``:
@@ -36,7 +32,7 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from geodesy_visualization.geo import extract_profile, generate_tracks, region_from_grd
+from geodesy_visualization.geo import extract_profile, generate_tracks
 from geodesy_visualization.grid_preparation import prepare_dataset_grid
 from geodesy_visualization.io import (
     get_optional,
@@ -64,10 +60,7 @@ from geodesy_visualization.styles import (
     parse_font_style,
     resolve_cpt_reference,
 )
-from geodesy_visualization.backends.pygmt import PyGMTPlotter
-from geodesy_visualization.figure_ops.deformation_layers import DEFORMATION_HANDLERS
 from geodesy_visualization.figure_ops.executor import FigureExecutor
-from geodesy_visualization.figure_ops.profile_layers import PROFILE_HANDLERS
 from geodesy_visualization.resources import resource_path
 from geodesy_visualization.workflows.insar.deformation_profile_plan import (
     compile_profile_figures,
@@ -313,116 +306,10 @@ def extract_profiles(dataset_cfgs: list[dict], tracks: dict) -> dict:
     return profiles
 
 
-def render_map(plotter: PyGMTPlotter, cfg: dict, dataset_cfg: dict, tracks: dict) -> None:
-    """Compose and save one deformation map with DEM, tracks, and optional marker."""
-    region = region_from_grd(dataset_cfg["grd_path"])
-    plotter.new()
-    plotter.draw_geo_basemap(region=region, projection=cfg["projection"], title=dataset_cfg["title"])
-    plotter.draw_dem(
-        dem_tif=cfg["dem_tif"],
-        cpt=cfg["dem_cpt"],
-        region=region,
-        projection=cfg["projection"],
-        bar_min=cfg["dem_bar_min"],
-        bar_max=cfg["dem_bar_max"],
-    )
-    plotter.draw_defo_grd(
-        data_grd=dataset_cfg["grd_path"],
-        cpt=cfg["defo_cpt"],
-        region=region,
-        projection=cfg["projection"],
-        bar_min=cfg["defo_bar_min"],
-        bar_max=cfg["defo_bar_max"],
-        transparency=cfg["defo_transparency"],
-        cpt_reverse=cfg["defo_cpt_reverse"],
-    )
-    plotter.draw_profile_tracks(
-        tracks=tracks,
-        line_pen=cfg["track_line_pen"],
-        start_label_font=cfg["track_label_font"],
-        start_justify=cfg["track_start_justify"],
-        end_justify=cfg["track_end_justify"],
-        end_suffix=cfg["track_end_suffix"],
-    )
-    if cfg["marker_lon"] is not None and cfg["marker_lat"] is not None:
-        plotter.add_marker(
-            lon=cfg["marker_lon"],
-            lat=cfg["marker_lat"],
-            style=cfg["marker_style"],
-            pen=cfg["marker_pen"],
-            fill=cfg["marker_fill"] or None,
-        )
-    if cfg["add_colorbar"]:
-        plotter.add_colorbar(label=cfg["defo_colorbar_label"], unit=cfg["defo_colorbar_unit"])
-    if cfg["add_scale"]:
-        plotter.add_scale(
-            region=region,
-            projection=cfg["projection"],
-            map_scale=cfg["map_scale"],
-            box=cfg["map_scale_box"],
-            scale_height=cfg["map_scale_height"],
-            font_annot=cfg["map_scale_font_annot"],
-            font_label=cfg["map_scale_font_label"],
-        )
-    if cfg["add_rose"]:
-        plotter.add_rose(region=region, projection=cfg["projection"])
-    plotter.save(dataset_cfg["output_map"])
-
-
 def profile_output_path(cfg: dict, track_name: str, mode: str) -> str:
     """Build the output filename for one track and profile rendering mode."""
     filename = f"{cfg['profile_title_prefix']}_{track_name}_{mode}.png"
     return str(Path(cfg["output_dir"]) / filename)
-
-
-def render_profiles(plotter: PyGMTPlotter, cfg: dict, dataset_cfgs: list[dict], profiles: dict) -> None:
-    """Render configured line and scatter comparisons for every profile track."""
-    for track_name, track_profiles in profiles.items():
-        title = f"{cfg['profile_title_prefix']} {track_name}"
-        if cfg["line_profiles"]:
-            plotter.new()
-            plotter.draw_math_basemap(
-                profiles=track_profiles,
-                title=title,
-                x_label=cfg["profile_x_label"],
-                y_label=cfg["profile_y_label"],
-                padding=cfg["profile_padding"],
-                projection=cfg["profile_projection"],
-            )
-            for dataset_cfg, profile in zip(dataset_cfgs, track_profiles):
-                plotter.draw_line_2d(
-                    profile=profile,
-                    label=dataset_cfg["label"],
-                    pen=dataset_cfg["line_pen"],
-                )
-            plotter.add_legend(
-                position=cfg["profile_legend_position"], box=cfg["profile_legend_box"]
-            )
-            plotter.save(profile_output_path(cfg, track_name, "line"))
-
-        if cfg["scatter_profiles"]:
-            plotter.new()
-            plotter.draw_math_basemap(
-                profiles=track_profiles,
-                title=title,
-                x_label=cfg["profile_x_label"],
-                y_label=cfg["profile_y_label"],
-                padding=cfg["profile_padding"],
-                projection=cfg["profile_projection"],
-            )
-            for dataset_cfg, profile in zip(dataset_cfgs, track_profiles):
-                plotter.draw_scatter_2d(
-                    profile=profile,
-                    label=dataset_cfg["label"],
-                    style=dataset_cfg["scatter_style"],
-                    pen=dataset_cfg["scatter_pen"],
-                    fill=dataset_cfg["scatter_fill"],
-                    transparency=dataset_cfg["scatter_transparency"],
-                )
-            plotter.add_legend(
-                position=cfg["profile_legend_position"], box=cfg["profile_legend_box"]
-            )
-            plotter.save(profile_output_path(cfg, track_name, "scatter"))
 
 
 def main(arguments: Sequence[str] | None = None) -> None:
@@ -447,6 +334,11 @@ def main(arguments: Sequence[str] | None = None) -> None:
         prepare_dataset_grid(dataset_cfg)
 
     profiles = extract_profiles(dataset_cfgs, tracks)
+    from geodesy_visualization.figure_ops.deformation_layers import (
+        DEFORMATION_HANDLERS,
+    )
+    from geodesy_visualization.figure_ops.profile_layers import PROFILE_HANDLERS
+
     handlers = {**DEFORMATION_HANDLERS, **PROFILE_HANDLERS}
     for plan in compile_profile_figures(cfg, tracks, profiles):
         FigureExecutor(plan, handlers=handlers).execute_plan()
@@ -462,8 +354,6 @@ __all__ = [
     "load_dataset_cfg",
     "main",
     "profile_output_path",
-    "render_map",
-    "render_profiles",
 ]
 
 

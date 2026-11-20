@@ -41,6 +41,9 @@ Geodesy-Visualization/
 │   ├── io.py                         # canonical config and file I/O / 正式配置与文件 I/O
 │   ├── geo.py                        # view geometry and sampling / 视图几何与采样
 │   ├── figure_ops/                    # ordered PyGMT operation plans / 有序 PyGMT 操作计划
+│   │   ├── model.py                   # Figure/Panel/Layer plans / 图、面板与图层计划
+│   │   ├── executor.py                # shared lazy executor / 公共延迟执行器
+│   │   └── *_layers.py                # registered workflow handlers / 工作流图层处理器
 │   ├── workflows/cartography/
 │   │   └── study_area.py              # study-area and footprint workflow / 研究区与 footprint 流程
 │   ├── workflows/insar/
@@ -81,6 +84,20 @@ The tracked example datasets allow both workflows to run after cloning. Generate
 - Workflow parameters: [footprint.cfg](config_examples/study_area/footprint.cfg), [deformation_map.cfg](config_examples/deformation_map/deformation_map.cfg), and [deformation_profile.cfg](config_examples/deformation_profile/deformation_profile.cfg).<br>流程参数说明：上述示例 cfg。
 
 ## 3. Workflow Overview / 流程总览
+
+All PyGMT workflows now use the same internal path established by `footprint`:
+the cfg is validated, compiled into immutable `FigurePlan` / `PanelPlan` /
+`LayerOperation` objects, and executed by registered layer handlers. Routine
+workflows keep compact domain cfg files; only advanced study-area composition
+requires users to write ordered `figure.*` sections. `--dry-run` performs input
+validation and prints the compiled order without importing PyGMT or creating a
+figure.
+
+所有 PyGMT 工作流现已统一采用 `footprint` 建立的内部路径：先校验 cfg，再编译为
+不可变的 `FigurePlan` / `PanelPlan` / `LayerOperation`，最后由注册图层 handler
+执行。常规工作流仍使用简洁的领域 cfg；只有高级研究区组合图需要用户直接编写
+有序 `figure.*` section。`--dry-run` 会校验输入并打印编译顺序，但不会导入
+PyGMT 或创建 Figure。
 
 ### 3.1 Study Area And Data Footprints / 研究区与数据 Footprint
 
@@ -253,27 +270,19 @@ Paths inside a cfg file are resolved from the declared project context rather th
 
 cfg 中的路径按声明的项目上下文解析，而不是终端当前目录；显式 `output_dir` 优先，否则由项目、case 和方法根自动生成 `FIGURES/PUBLICATION/<WORKFLOW>`。
 
-Every workflow accepts exactly one configuration source: `--config` for one
-figure job or `--list` for a repeatable batch. A list contains one cfg path per
-line; blank lines and lines beginning with `#` are ignored, and relative paths
-are resolved from the list file. Jobs continue after an independent failure and
-the command prints a final success/failure summary.
+Every workflow uses one explicit `--config` file. The cfg is the complete,
+visible record of paths and plotting parameters; no second list-control syntax
+is imposed by Visualization.
 
-每个工作流只接受一种配置来源：单个图件使用 `--config`，可重复批处理使用
-`--list`。列表每行填写一个 cfg 路径；空行和以 `#` 开头的注释会被忽略，
-相对路径以列表文件所在目录为基准解析。某个独立任务失败后仍继续后续任务，
-最后统一输出成功和失败汇总。
+每个工作流使用一个明确的 `--config` 文件。cfg 完整、可见地记录路径和绘图
+参数；Visualization 不再额外设置 list 控制语法。
 
-```text
-# publication_jobs.list
-study_area_reference.cfg
-study_area_secondary.cfg
-```
+Re-running a job is intentionally allowed. Existing destination figures are
+replaced only after the new figure is complete, so users may edit parameters
+and run the same cfg again without changing a run identifier.
 
-```bash
-conda run -n envPlot geodesy-visualization study-area \
-  --list publication_jobs.list
-```
+工作流允许直接重复运行。新图完整生成后才会替换已有目标，因此修改参数后可以
+继续使用同一个 cfg，无需改 run id。
 
 ### 5.1 Study Area And Data Footprints / 研究区与数据 Footprint
 

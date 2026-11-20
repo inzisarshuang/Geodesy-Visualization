@@ -20,20 +20,10 @@ geodesy_visualization.workflows.insar.deformation_map
         构建命令行参数解析器。
     ``load_config``:
         读取、解析并校验地图绘制所需的全部配置。
-    ``draw_basemap``:
-        根据数据集配置绘制 DEM、光学影像或空白底图。
-    ``draw_deformation``:
-        根据配置以网格或散点模式叠加形变数据。
-    ``draw_target_regions``:
-        绘制目标区域边框、中心标记和标签。
     ``parse_kml_clip`` / ``clip_grid_with_kml``:
         读取 KML 裁剪边界并准备临时裁剪网格。
     ``parse_kml_features``:
         读取 KML 中的线/面覆盖边界和点目标。
-    ``render_map``:
-        组合并保存一个数据集的完整形变地图。
-    ``render_coverage_map``:
-        仅绘制光学底图、KML 覆盖边界和 GNSS 测站。
     ``compile_deformation_maps``:
         将紧凑工作流配置编译为与 footprint 一致的有序图层计划。
     ``main``:
@@ -46,14 +36,12 @@ import argparse
 import re
 import subprocess
 import xml.etree.ElementTree as ET
-from copy import copy
 from collections.abc import Sequence
 from pathlib import Path
 import numpy as np
 
 from geodesy_visualization.resources import resource_path
 
-from geodesy_visualization.geo import region_from_grd
 from geodesy_visualization.io import (
     get_optional,
     get_required,
@@ -78,8 +66,6 @@ from geodesy_visualization.styles import (
     parse_font_style,
     resolve_cpt_reference,
 )
-from geodesy_visualization.backends.pygmt import PyGMTPlotter
-from geodesy_visualization.figure_ops.deformation_layers import DEFORMATION_HANDLERS
 from geodesy_visualization.figure_ops.executor import FigureExecutor
 from geodesy_visualization.workflows.insar.deformation_map_plan import (
     compile_deformation_maps,
@@ -517,191 +503,6 @@ def parse_kml_features(path: str) -> tuple[list[tuple[np.ndarray, np.ndarray]], 
     return geometries, points
 
 
-def render_coverage_map(plotter: PyGMTPlotter, cfg: dict) -> None:
-    """Render an optical basemap with coverage polygons and GNSS station labels."""
-    region = cfg["region"]
-    if region is None:
-        raise ValueError("coverage maps require region_west/east/south/north.")
-    plotter.new()
-    plotter.draw_geo_basemap(region=region, projection=cfg["projection"], title=cfg["coverage_title"])
-    plotter.draw_optic(optic_tif=cfg["optic_tif"], region=region, projection=cfg["projection"])
-    figure = plotter._require_figure()
-    pens = cfg["coverage_pen"]
-    if len(pens) not in {1, len(cfg["coverage_kml"])}:
-        raise ValueError(
-            "coverage_pen must contain one value or exactly one value per coverage_kml."
-        )
-    for index, coverage_kml in enumerate(cfg["coverage_kml"]):
-        geometries, _ = parse_kml_features(coverage_kml)
-        pen = pens[0] if len(pens) == 1 else pens[index]
-        for x, y in geometries:
-            figure.plot(x=x, y=y, pen=pen)
-    _, stations = parse_kml_features(cfg["gnss_kml"])
-    for station in stations:
-        figure.plot(x=[station["x"]], y=[station["y"]], style=cfg["gnss_style"], fill="yellow", pen=cfg["gnss_pen"])
-        if cfg["gnss_labels"]:
-            figure.text(
-                x=station["x"] + cfg["gnss_label_offset"],
-                y=station["y"] + cfg["gnss_label_offset"],
-                text=station["name"],
-                font=cfg["gnss_label_font"],
-                justify="BL",
-            )
-    if cfg["add_scale"]:
-        plotter.add_scale(region=region, projection=cfg["projection"], map_scale=cfg["map_scale"], box=cfg["map_scale_box"], scale_height=cfg["map_scale_height"], font_annot=cfg["map_scale_font_annot"], font_label=cfg["map_scale_font_label"])
-    if cfg["add_rose"]:
-        plotter.add_rose(region=region, projection=cfg["projection"])
-    plotter.save(cfg["coverage_output"])
-
-
-def draw_basemap(
-    plotter: PyGMTPlotter,
-    cfg: dict,
-    region: list[float],
-    projection: str,
-    basemap_mode: str,
-) -> None:
-    """Draw the DEM or optical basemap selected for one deformation dataset."""
-    if basemap_mode == "optic":
-        plotter.draw_optic(
-            optic_tif=cfg["optic_tif"],
-            region=region,
-            projection=projection,
-        )
-        return
-    if basemap_mode == "dem":
-        plotter.draw_dem(
-            dem_tif=cfg["dem_tif"],
-            cpt=cfg["dem_cpt"],
-            region=region,
-            projection=projection,
-            bar_min=cfg["dem_bar_min"],
-            bar_max=cfg["dem_bar_max"],
-        )
-        return
-    raise ValueError(f"unsupported basemap_mode: {basemap_mode}")
-
-
-def draw_deformation(plotter: PyGMTPlotter, cfg: dict, dataset_cfg: dict, region: list[float]) -> None:
-    """Draw one deformation dataset as a continuous grid or colored scatter layer."""
-    if dataset_cfg["defo_mode"] == "grd":
-        plotter.draw_defo_grd(
-            data_grd=dataset_cfg["grd_path"],
-            cpt=cfg["defo_cpt"],
-            region=region,
-            projection=cfg["projection"],
-            bar_min=cfg["defo_bar_min"],
-            bar_max=cfg["defo_bar_max"],
-            transparency=cfg["defo_transparency"],
-            cpt_reverse=cfg["defo_cpt_reverse"],
-        )
-        return
-    if dataset_cfg["defo_mode"] == "scatter":
-        plotter.draw_defo_scatter(
-            data_grd=dataset_cfg["grd_path"],
-            cpt=cfg["defo_cpt"],
-            region=region,
-            projection=cfg["projection"],
-            bar_min=cfg["defo_bar_min"],
-            bar_max=cfg["defo_bar_max"],
-            style=cfg["scatter_style"],
-            pen=cfg["scatter_pen"],
-            transparency=cfg["defo_transparency"],
-            cpt_reverse=cfg["defo_cpt_reverse"],
-        )
-        return
-    raise ValueError(f"unsupported defo_mode: {dataset_cfg['defo_mode']}")
-
-
-def draw_target_regions(plotter: PyGMTPlotter, cfg: dict) -> None:
-    """Overlay configured target ellipses, center markers, and labels on the active map."""
-    if not cfg["target_regions"]:
-        return
-    figure = plotter._require_figure()
-    theta = np.linspace(0, 2 * np.pi, 181)
-    for target in cfg["target_regions"]:
-        west, east = target["west"], target["east"]
-        south, north = target["south"], target["north"]
-        cx = (west + east) / 2.0
-        cy = (south + north) / 2.0
-        rx = (east - west) / 2.0
-        ry = (north - south) / 2.0
-        x = cx + rx * np.cos(theta)
-        y = cy + ry * np.sin(theta)
-        figure.plot(x=x, y=y, pen=cfg["target_region_pen"])
-        figure.plot(
-            x=[cx],
-            y=[cy],
-            style=cfg["target_region_center_style"],
-            fill="black",
-            pen="0.5p,white",
-        )
-        offset = cfg["target_region_label_offset"]
-        label_position = target["label_position"]
-        if label_position == "bottom":
-            label_x, label_y, justify = cx, south - offset, "TC"
-        elif label_position == "right":
-            label_x, label_y, justify = east + offset, cy, "ML"
-        elif label_position == "left":
-            label_x, label_y, justify = west - offset, cy, "MR"
-        elif label_position in {"northeast", "ne"}:
-            label_x, label_y, justify = east + offset, north + offset, "BL"
-        else:
-            label_x, label_y, justify = cx, north + offset, "BC"
-        figure.text(
-            x=label_x,
-            y=label_y,
-            text=target["label"],
-            font=cfg["target_region_label_font"],
-            justify=justify,
-        )
-
-
-def render_map(plotter: PyGMTPlotter, cfg: dict, dataset_cfg: dict) -> None:
-    """Compose and save one complete deformation map for a normalized dataset config."""
-    region = cfg["region"] or region_from_grd(dataset_cfg["grd_path"])
-    plotter.new()
-    plotter.draw_geo_basemap(region=region, projection=cfg["projection"], title=dataset_cfg["title"])
-    draw_basemap(plotter, cfg, region, cfg["projection"], dataset_cfg["basemap_mode"])
-    figure = plotter._require_figure()
-    native_clip = getattr(figure, "clip", None)
-    if cfg["clip_kml"] and callable(native_clip):
-        clip_x, clip_y = parse_kml_clip(cfg["clip_kml"])
-        native_clip(x=clip_x, y=clip_y, projection=cfg["projection"], region=region)
-        try:
-            draw_deformation(plotter, cfg, dataset_cfg, region)
-        finally:
-            native_clip(c=True)
-    else:
-        dataset_to_draw = dataset_cfg
-        if cfg["clip_kml"]:
-            dataset_to_draw = copy(dataset_cfg)
-            dataset_to_draw["grd_path"] = clip_grid_with_kml(
-                dataset_cfg["grd_path"], cfg["clip_kml"]
-            )
-        draw_deformation(plotter, cfg, dataset_to_draw, region)
-    draw_target_regions(plotter, cfg)
-    if cfg["add_colorbar"]:
-        plotter.add_colorbar(
-            label=cfg["defo_colorbar_label"],
-            unit=cfg["defo_colorbar_unit"],
-            tick_interval=cfg["defo_colorbar_tick_interval"] or None,
-        )
-    if cfg["add_scale"]:
-        plotter.add_scale(
-            region=region,
-            projection=cfg["projection"],
-            map_scale=cfg["map_scale"],
-            box=cfg["map_scale_box"],
-            scale_height=cfg["map_scale_height"],
-            font_annot=cfg["map_scale_font_annot"],
-            font_label=cfg["map_scale_font_label"],
-        )
-    if cfg["add_rose"]:
-        plotter.add_rose(region=region, projection=cfg["projection"])
-    plotter.save(dataset_cfg["output"])
-
-
 def main(arguments: Sequence[str] | None = None) -> None:
     """Prepare enabled grids, compile layer plans, and execute every requested map."""
     args = build_parser().parse_args(arguments)
@@ -714,6 +515,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
                 print(f"  {layer.order + 1:02d}. {layer.section}")
             print(f"Output: {plan.operations[-1].options['fname']}")
         return
+    from geodesy_visualization.figure_ops.deformation_layers import (
+        DEFORMATION_HANDLERS,
+    )
+
     if cfg["map_mode"] == "coverage":
         for plan in compile_deformation_maps(cfg):
             FigureExecutor(plan, handlers=DEFORMATION_HANDLERS).execute_plan()
@@ -733,17 +538,12 @@ __all__ = [
     "ALLOWED_KEYS",
     "build_parser",
     "compile_deformation_maps",
-    "draw_basemap",
-    "draw_deformation",
-    "draw_target_regions",
     "load_config",
     "main",
     "optional_path",
     "parse_manual_region",
     "parse_target_regions",
     "parse_kml_features",
-    "render_map",
-    "render_coverage_map",
     "validate_raw_config",
 ]
 

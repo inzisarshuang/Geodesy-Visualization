@@ -47,9 +47,7 @@ def render_deformation_basemap(
         grid = str(options["region_grid"])
         if not grid:
             raise ValueError(f"[{operation.section}] requires an explicit region")
-        from geodesy_visualization.workflows.insar.deformation_map import (
-            region_from_grd,
-        )
+        from geodesy_visualization.geo import region_from_grd
 
         region = tuple(region_from_grd(grid))
     context.region = tuple(region)
@@ -140,18 +138,43 @@ def render_deformation_targets(
     options = dict(operation.options)
     if not options["targets"]:
         return
-    from geodesy_visualization.workflows.insar.deformation_map import draw_target_regions
+    import numpy as np
 
-    draw_target_regions(
-        _plotter(context),
-        {
-            "target_regions": list(options["targets"]),
-            "target_region_pen": options["pen"],
-            "target_region_label_font": options["label_font"],
-            "target_region_label_offset": options["label_offset"],
-            "target_region_center_style": options["center_style"],
-        },
-    )
+    theta = np.linspace(0, 2 * np.pi, 181)
+    for target in options["targets"]:
+        west, east = target["west"], target["east"]
+        south, north = target["south"], target["north"]
+        center_x = (west + east) / 2.0
+        center_y = (south + north) / 2.0
+        x = center_x + (east - west) / 2.0 * np.cos(theta)
+        y = center_y + (north - south) / 2.0 * np.sin(theta)
+        context.figure.plot(x=x, y=y, pen=options["pen"])
+        context.figure.plot(
+            x=[center_x],
+            y=[center_y],
+            style=options["center_style"],
+            fill="black",
+            pen="0.5p,white",
+        )
+        offset = float(options["label_offset"])
+        position = target["label_position"]
+        if position == "bottom":
+            label_x, label_y, justify = center_x, south - offset, "TC"
+        elif position == "right":
+            label_x, label_y, justify = east + offset, center_y, "ML"
+        elif position == "left":
+            label_x, label_y, justify = west - offset, center_y, "MR"
+        elif position in {"northeast", "ne"}:
+            label_x, label_y, justify = east + offset, north + offset, "BL"
+        else:
+            label_x, label_y, justify = center_x, north + offset, "BC"
+        context.figure.text(
+            x=label_x,
+            y=label_y,
+            text=target["label"],
+            font=options["label_font"],
+            justify=justify,
+        )
 
 
 def render_deformation_coverage(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +15,9 @@ sys.path.insert(0, str(REPOSITORY_ROOT))
 from geodesy_visualization.workflows.insar import deformation_map as canonical
 from geodesy_visualization.workflows.insar.deformation_map_plan import (
     compile_deformation_maps,
+)
+from geodesy_visualization.figure_ops.deformation_layers import (
+    render_deformation_targets,
 )
 
 
@@ -108,6 +112,41 @@ class DeformationMapWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(factory.call_count, 2)
         self.assertEqual(executor.execute_plan.call_count, 2)
+
+    def test_target_layer_owns_ellipse_center_and_label_rendering(self) -> None:
+        """Keep target annotations in the registered layer instead of the workflow."""
+        figure = MagicMock()
+        context = SimpleNamespace(figure=figure)
+        operation = SimpleNamespace(
+            section="figure.plot.targets.sbas",
+            options={
+                "targets": (
+                    {
+                        "west": 1.0,
+                        "east": 3.0,
+                        "south": 2.0,
+                        "north": 4.0,
+                        "label": "A",
+                        "label_position": "top",
+                    },
+                ),
+                "pen": "1p,black",
+                "label_font": "10p,Helvetica",
+                "label_offset": 0.1,
+                "center_style": "c0.1c",
+            },
+        )
+
+        render_deformation_targets(context, operation)
+
+        self.assertEqual(figure.plot.call_count, 2)
+        figure.text.assert_called_once_with(
+            x=2.0,
+            y=4.1,
+            text="A",
+            font="10p,Helvetica",
+            justify="BC",
+        )
 
 
 if __name__ == "__main__":

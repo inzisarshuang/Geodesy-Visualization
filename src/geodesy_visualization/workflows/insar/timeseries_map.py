@@ -12,8 +12,6 @@ geodesy_visualization.workflows.insar.timeseries_map
     ``load_config``: 读取并校验空间时序图配置。
     ``load_timeseries_table``: 分块读取坐标和所选时序列。
     ``compile_timeseries_map``: 将所选时期编译为共享 CPT 的 PanelPlan。
-    ``draw_panel_basemap``: 绘制空白、DEM 或光学底图。
-    ``render``: 组合时序子图并安全保存。
     ``main``: 执行配置加载、数据读取和绘图。
 """
 
@@ -24,11 +22,9 @@ from collections.abc import Sequence
 import subprocess
 import sys
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import pandas as pd
-import pygmt
 
 from geodesy_visualization.io import (
     get_optional,
@@ -54,9 +50,7 @@ from geodesy_visualization.styles import (
     parse_font_style,
     resolve_cpt_reference,
 )
-from geodesy_visualization.backends.pygmt import PyGMTPlotter
 from geodesy_visualization.figure_ops.executor import FigureExecutor
-from geodesy_visualization.figure_ops.timeseries_layers import TIMESERIES_HANDLERS
 from geodesy_visualization.workflows.insar.timeseries_map_plan import (
     compile_timeseries_map,
 )
@@ -307,17 +301,6 @@ def load_timeseries_table(
     return table[valid_coordinates, 0], table[valid_coordinates, 1], values[valid_coordinates], dates[start_epoch - 1 : end_epoch]
 
 
-def draw_panel_basemap(plotter: PyGMTPlotter, cfg: dict[str, object]) -> None:
-    """Draw the configured blank, optical or DEM background on the active panel."""
-    if cfg["basemap_mode"] == "optic":
-        plotter.draw_optic(str(cfg["basemap_tif"]), cfg["region"], str(cfg["projection"]))
-    elif cfg["basemap_mode"] == "dem":
-        plotter.draw_dem(
-            str(cfg["basemap_tif"]), str(cfg["dem_cpt"]), cfg["region"], str(cfg["projection"]),
-            float(cfg["dem_bar_min"]), float(cfg["dem_bar_max"]),
-        )
-
-
 def _length_to_points(value: str) -> float:
     """Convert a positive GMT length in points, centimeters, or inches to points."""
     text = value.strip().lower()
@@ -355,67 +338,6 @@ def _format_panel_title(date: str, cfg: dict[str, object]) -> str:
     return f"{cfg['title_prefix']}{formatted}"
 
 
-def _draw_panel_frame(
-    plotter: PyGMTPlotter,
-    cfg: dict[str, object],
-    title: str,
-    index: int,
-    title_font: str,
-    coordinate_font: str,
-) -> None:
-    """Draw a panel border plus optional shared-edge coordinates and title."""
-    figure = plotter._require_figure()
-    figure.basemap(
-        region=cfg["region"],
-        projection=str(cfg["projection"]),
-        frame="0",
-    )
-
-    row, column = divmod(index, int(cfg["columns"]))
-    mode = str(cfg["coordinate_mode"])
-    show_x = mode == "all" or (mode == "outer" and row == int(cfg["rows"]) - 1)
-    show_y = mode == "all" or (mode == "outer" and column == 0)
-    if show_x or show_y:
-        axes = ("W" if show_y else "") + ("S" if show_x else "")
-        frame = [axes]
-        if show_x:
-            interval = float(cfg["longitude_interval"])
-            grid = f"g{interval:g}" if cfg["show_coordinate_grid"] else ""
-            frame.append(f"xaf{interval:g}{grid}")
-        if show_y:
-            interval = float(cfg["latitude_interval"])
-            grid = f"g{interval:g}" if cfg["show_coordinate_grid"] else ""
-            frame.append(f"yaf{interval:g}{grid}")
-        with pygmt.config(
-            FONT_ANNOT_PRIMARY=coordinate_font,
-            FORMAT_GEO_MAP=str(cfg["coordinate_format"]),
-            MAP_FRAME_TYPE="plain",
-            MAP_FRAME_PEN="0.7p,black",
-        ):
-            figure.basemap(
-                region=cfg["region"],
-                projection=str(cfg["projection"]),
-                frame=frame,
-            )
-
-    west, east, south, north = cfg["region"]
-    figure.plot(
-        x=[west, east, east, west, west],
-        y=[south, south, north, north, south],
-        pen="0.7p,black",
-    )
-    if cfg["show_panel_title"]:
-        figure.text(
-            x=(west + east) / 2,
-            y=north,
-            text=title,
-            justify="BC",
-            offset="0p/6p",
-            no_clip=True,
-            font=title_font,
-        )
-
-
 def _projected_panel_size(region: list[float], projection: str) -> tuple[str, str]:
     """Ask GMT for the projected map width and height and return centimeter sizes."""
     environment_gmt = Path(sys.prefix) / "bin" / "gmt"
@@ -437,140 +359,6 @@ def _projected_panel_size(region: list[float], projection: str) -> tuple[str, st
     if not np.isfinite(width) or not np.isfinite(height) or width <= 0 or height <= 0:
         raise ValueError(f"invalid projected panel dimensions: {width}, {height}")
     return f"{width:.8g}c", f"{height:.8g}c"
-
-
-def render(
-    cfg: dict[str, object],
-    longitude: np.ndarray,
-    latitude: np.ndarray,
-    values: np.ndarray,
-    dates: list[str],
-) -> Path:
-    """Render selected epochs as geographic scatter-map panels and save atomically."""
-    def draw_data(figure: object, index: int) -> None:
-        """Draw one selected column from the legacy in-memory table."""
-        _plot_scatter(
-            figure,
-            cfg,
-            longitude,
-            latitude,
-            values[:, index],
-        )
-
-    return _render_panels(cfg, dates, draw_data)
-
-
-def _plot_scatter(
-    figure: object,
-    cfg: dict[str, object],
-    longitude: np.ndarray,
-    latitude: np.ndarray,
-    values: np.ndarray,
-) -> None:
-    """Draw one scatter batch with the workflow's shared point style."""
-    kwargs = {
-        "x": longitude,
-        "y": latitude,
-        "fill": values,
-        "cmap": True,
-        "style": str(cfg["point_style"]),
-    }
-    if cfg["point_pen"]:
-        kwargs["pen"] = str(cfg["point_pen"])
-    figure.plot(**kwargs)
-
-
-def _render_panels(
-    cfg: dict[str, object],
-    dates: list[str],
-    draw_data: Callable[[object, int], None],
-) -> Path:
-    """Compose shared panel furniture and delegate each panel's deformation layer."""
-    plotter = PyGMTPlotter(defaults=cfg["defaults"])
-    plotter.new()
-    figure = plotter._require_figure()
-    # GMT projections preserve geographic geometry. Deriving both subplot
-    # dimensions from the same -R/-J pair prevents a square subplot slot from
-    # being combined with a shorter Mercator map.
-    panel_width, panel_height = _projected_panel_size(
-        list(cfg["region"]), str(cfg["projection"])
-    )
-    bold = bool(cfg["font_bold"])
-    title_font = _scaled_font(
-        float(cfg["panel_title_font_size"]), cfg, panel_width, bold=bold
-    )
-    tag_font = _scaled_font(
-        float(cfg["panel_number_font_size"]), cfg, panel_width, bold=bold
-    )
-    coordinate_font = _scaled_font(
-        float(cfg["coordinate_font_size"]), cfg, panel_width, bold=bold
-    )
-    colorbar_annotation_font = _scaled_font(
-        float(cfg["colorbar_annotation_font_size"]), cfg, panel_width, bold=bold
-    )
-    colorbar_label_font = _scaled_font(
-        float(cfg["colorbar_label_font_size"]), cfg, panel_width, bold=bold
-    )
-    pygmt.makecpt(
-        cmap=str(cfg["cpt"]),
-        series=[float(cfg["bar_min"]), float(cfg["bar_max"]), float(cfg["bar_step"])],
-        reverse=bool(cfg["cpt_reverse"]),
-        continuous=True,
-    )
-    subplot_options = {
-        "nrows": int(cfg["rows"]),
-        "ncols": int(cfg["columns"]),
-        "subsize": (panel_width, panel_height),
-        "region": cfg["region"],
-        "projection": str(cfg["projection"]),
-        "margins": [str(cfg["panel_margin_x"]), str(cfg["panel_margin_y"])],
-    }
-    if cfg["show_panel_number"]:
-        subplot_options["autolabel"] = (
-            f"{cfg['panel_number_style']}+jTL+o8p/8p+gwhite@70"
-        )
-    with pygmt.config(FONT_TAG=tag_font), figure.subplot(
-        **subplot_options,
-    ):
-        for index, date in enumerate(dates):
-            with figure.set_panel(panel=index):
-                _draw_panel_frame(
-                    plotter,
-                    cfg,
-                    _format_panel_title(date, cfg),
-                    index,
-                    title_font,
-                    coordinate_font,
-                )
-                draw_panel_basemap(plotter, cfg)
-                draw_data(figure, index)
-    if cfg["add_colorbar"]:
-        with pygmt.config(
-            FONT_ANNOT_PRIMARY=colorbar_annotation_font,
-            # GMT draws a horizontal colorbar's end unit (for example ``mm``)
-            # with the secondary annotation font, not the axis-label font.
-            FONT_ANNOT_SECONDARY=colorbar_annotation_font,
-            FONT_LABEL=colorbar_label_font,
-        ):
-            figure.colorbar(
-                cmap=True,
-                position=(
-                    f"JBC+o{cfg['colorbar_offset']}+w{cfg['colorbar_width']}"
-                    f"/{cfg['colorbar_height']}+h"
-                ),
-                frame=[
-                    f"xa{float(cfg['colorbar_interval']):g}+l{cfg['colorbar_label']}",
-                    f"y+l{cfg['colorbar_unit']}",
-                ],
-                box=str(cfg["colorbar_box"]),
-            )
-    destination = Path(str(cfg["output"]))
-    plotter.save(
-        str(destination),
-        dpi=int(cfg["output_dpi"]),
-        canvas_margin=str(cfg["canvas_margin"]),
-    )
-    return destination
 
 
 def main(arguments: Sequence[str] | None = None) -> None:
@@ -595,6 +383,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
             print(f"  Panel {panel.identifier}: {panel.layers[-1].options['date']}")
         print(f"Output: {plan.figure_layers[-1].options['fname']}")
         return
+    from geodesy_visualization.figure_ops.timeseries_layers import (
+        TIMESERIES_HANDLERS,
+    )
+
     data = load_timeseries_table(
         str(cfg["data_file"]), str(cfg["dates_file"]), int(cfg["start_epoch"]),
         int(cfg["end_epoch"]), float(cfg["scale"]), int(cfg["chunk_rows"]),
@@ -609,11 +401,9 @@ __all__ = [
     "ALLOWED_KEYS",
     "build_parser",
     "compile_timeseries_map",
-    "draw_panel_basemap",
     "load_config",
     "load_timeseries_table",
     "main",
-    "render",
 ]
 
 

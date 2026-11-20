@@ -28,7 +28,7 @@ from geodesy_visualization.resources import resource_path
 
 
 DEFAULT_CONFIG = resource_path(
-    "config_examples", "visualization", "study_area", "footprint.cfg"
+    "config_examples", "study_area", "footprint.cfg"
 )
 
 

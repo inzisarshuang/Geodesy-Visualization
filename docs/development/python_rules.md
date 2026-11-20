@@ -7,6 +7,9 @@
 - Keep processing-product parsing and conversion in Geodesy-DataAdapter under `envInSAR`; Visualization accepts only plot-ready exchange files under `envPlot`.<br>处理产品的解析和转换保留在 `envInSAR` 中的 Geodesy-DataAdapter；Visualization 在 `envPlot` 中只接收已准备的交换文件。
 - Put PyGMT figure state and reusable drawing primitives in `src/geodesy_visualization/backends/pygmt.py`; `lib/pygmt_visual.py` is compatibility-only.<br>PyGMT 绘图状态和公共绘图原语放在 `src/geodesy_visualization/backends/pygmt.py`；`lib/pygmt_visual.py` 只用于兼容。
 - Put canonical cfg normalization and orchestration in `src/geodesy_visualization/workflows/`. Keep workflow cfg and input-data examples in `config_examples/<workflow>`.<br>正式的 cfg 参数归一化和流程编排放在 `src/geodesy_visualization/workflows/`；配置与数据示例统一放在 `config_examples/<workflow>/`。
+- Compile each PyGMT workflow into `FigurePlan`, `PanelPlan`, and `LayerOperation` objects before rendering. Put drawing handlers in `src/geodesy_visualization/figure_ops/*_layers.py`; workflow modules must not import `pygmt` or the compatibility `PyGMTPlotter` backend.<br>每个 PyGMT 工作流在绘制前必须编译为 `FigurePlan`、`PanelPlan` 和 `LayerOperation`；绘图 handler 放在 `src/geodesy_visualization/figure_ops/*_layers.py`，workflow 模块不得导入 `pygmt` 或兼容 `PyGMTPlotter` 后端。
+- Keep rendering imports after the `--dry-run` return point. Dry-run owns cfg/input validation and plan inspection, but must not initialize PyGMT.<br>绘图相关导入放在 `--dry-run` 返回点之后；dry-run 负责 cfg/输入校验和计划检查，但不得初始化 PyGMT。
+- Compatibility modules under `lib/` may re-export installed package APIs, but must not modify `sys.path` or contain a second implementation.<br>`lib/` 下兼容模块只能重导出已安装包 API，不得修改 `sys.path` 或维护第二套实现。
 - Add domain, mask, and export modules only when they own independent reusable behavior.<br>只有存在独立且可复用的职责时，才新增领域计算、掩膜或产品导出模块。
 
 ## Interfaces

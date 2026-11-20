@@ -30,19 +30,13 @@ pygmt_geo
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 import warnings
 
 import numpy as np
 import rasterio
 
-from geodesy_visualization.io import replace_dataset, temporary_path
-
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-if str(_REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPOSITORY_ROOT))
-
 from geodesy_visualization.geo import extract_profile, generate_tracks, region_from_grd
+from geodesy_visualization.io import replace_dataset, temporary_path
 
 
 def _validate_matching_grids(src1: rasterio.io.DatasetReader, src2: rasterio.io.DatasetReader) -> None:

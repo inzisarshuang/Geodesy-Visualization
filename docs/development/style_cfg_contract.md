@@ -103,13 +103,23 @@ contract.
 PyGMT 版本适配器可以将稳定配置名称转换为服务器旧版接口；版本相关原始语法只
 属于适配器，不进入共享 CFG 契约。
 
+Routine deformation, profile, spatial time-series, and auxiliary time-series
+cfg files do not duplicate these sections. Their workflow compilers translate
+the compact domain keys into the same immutable `FigurePlan`, `PanelPlan`, and
+`LayerOperation` model. Direct `figure.*` sections are the advanced composition
+interface, not a second execution engine.
+
+常规形变地图、剖面、空间时序和辅助时序 cfg 不需要重复书写这些 section；各自的
+编译器会把简洁领域参数转换为同一套不可变 `FigurePlan`、`PanelPlan` 和
+`LayerOperation`。直接编写 `figure.*` 是高级组合接口，并非另一套执行引擎。
+
 ## 5. Current Inventory / 当前盘点
 
 | Workflow | Shared font blocks | Specialized controls |
 |---|---|---|
 | Deformation map | `default`, `map` | target regions, map scale, rose, DEM/deformation CPT |
 | Deformation profile | `default`, `map`, `profile` | tracks, markers, profile legend and padding |
-| Auxiliary time series | `default` | primary/secondary time frames and three Y axes |
+| Auxiliary time series | `default` | primary/secondary time frames, three Y axes, and optional combined legend labels/geometry |
 | Spatial time-series map | `default` | responsive panel fonts, outer/all/none coordinates, subplot layout, colorbar geometry |
 | Study area | Figure-operation sections | footprint/fault styles, sidecar layout, insets, meca, scalebar, directional rose |
 
@@ -137,3 +147,15 @@ the spatial multi-panel workflow.
 时序图继续使用主/次笛卡尔 GMT frame 字符串。二者只共享“是否显示”的概念，
 不共享解析器或底层 cfg 别名。子图行列、面板间距、画布留白和响应式字号继续仅
 属于时空多面板工作流。
+
+## 8. Execution And Output / 执行与输出
+
+Layer order is deterministic and visible in dry-run output. Workflow handlers
+own drawing only; cfg parsing and plan compilation must not import PyGMT.
+`savefig` is terminal among enabled layers and publishes through a temporary
+sibling followed by atomic replacement. Reusing an output path is supported
+and does not require a run identifier.
+
+图层顺序必须确定且能在 dry-run 输出中查看。workflow handler 只负责绘图；cfg
+解析与计划编译不得导入 PyGMT。`savefig` 必须是最后一个启用图层，并通过同目录
+临时文件加原子替换发布。允许重复使用同一输出路径，不强制 run id。

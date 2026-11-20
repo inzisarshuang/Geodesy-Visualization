@@ -13,13 +13,5 @@ pygmt_visual
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
-
-
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-if str(_REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPOSITORY_ROOT))
-
-from geodesy_visualization.backends.pygmt import *  # noqa: E402,F401,F403
-from geodesy_visualization.backends.pygmt import __all__  # noqa: E402,F401
+from geodesy_visualization.backends.pygmt import *  # noqa: F401,F403
+from geodesy_visualization.backends.pygmt import __all__  # noqa: F401

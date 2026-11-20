@@ -10,7 +10,6 @@ geodesy_visualization.workflows.insar.timeseries_aux
     ``load_config``: 读取并校验组合时序图配置。
     ``read_date_value_table``: 严格读取两列日期-数值文本。
     ``load_series``: 读取配置指定的四套日期序列。
-    ``render``: 绘制多纵轴时序图并安全保存。
     ``main``: 编译 FigurePlan 并通过共享执行器绘图。
 """
 
@@ -21,7 +20,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
-import pygmt
 
 from geodesy_visualization.io import (
     get_optional,
@@ -38,9 +36,7 @@ from geodesy_visualization.io import (
 )
 from geodesy_visualization.resources import resource_path
 from geodesy_visualization.styles import font_style_keys, parse_font_style
-from geodesy_visualization.backends.pygmt import PyGMTPlotter
 from geodesy_visualization.figure_ops.executor import FigureExecutor
-from geodesy_visualization.figure_ops.timeseries_layers import TIMESERIES_HANDLERS
 from geodesy_visualization.workflows.insar.timeseries_aux_plan import (
     compile_aux_timeseries,
 )
@@ -215,106 +211,6 @@ def load_series(cfg: dict[str, object]) -> dict[str, pd.DataFrame]:
     }
 
 
-# ---------------------------------------------------------------------------
-# Rendering
-# ---------------------------------------------------------------------------
-
-def render(cfg: dict[str, object], series: dict[str, pd.DataFrame]) -> Path:
-    """Render deformation, precipitation and temperature against a shared date axis."""
-    plotter = PyGMTPlotter(defaults=cfg["defaults"])
-    plotter.new()
-    figure = plotter._require_figure()
-    start = pd.to_datetime(cfg["date_start"], format="%Y%m%d")
-    end = pd.to_datetime(cfg["date_end"], format="%Y%m%d")
-    projection = str(cfg["projection"])
-
-    # All layers use the same physical plot rectangle. Each layer temporarily
-    # supplies its own Y range, so PyGMT can overlay three independent axes.
-    # Temperature owns the inner east axis.
-    temperature_region = [start, end, *cfg["temperature_range"]]
-    with pygmt.config(
-        FONT_LABEL=str(cfg["temperature_color"]),
-        FONT_ANNOT_PRIMARY=str(cfg["temperature_color"]),
-    ):
-        figure.basemap(
-            region=temperature_region,
-            projection=projection,
-            frame=["E", f"{cfg['temperature_y_frame']}+l{cfg['temperature_label']}"],
-        )
-    figure.plot(
-        x=series["temperature"]["date"],
-        y=series["temperature"]["value"],
-        region=temperature_region,
-        projection=projection,
-        pen=str(cfg["temperature_pen"]),
-    )
-
-    # Precipitation uses a second east axis. The annotation offset moves this
-    # scale outside the temperature scale instead of printing both in place.
-    precipitation_region = [start, end, *cfg["precip_range"]]
-    with pygmt.config(
-        FONT_LABEL=str(cfg["precip_color"]),
-        FONT_ANNOT_PRIMARY=str(cfg["precip_color"]),
-        MAP_ANNOT_OFFSET_PRIMARY="1.4c",
-    ):
-        figure.basemap(
-            region=precipitation_region,
-            projection=projection,
-            frame=["E", f"{cfg['precip_y_frame']}+l{cfg['precip_label']}"],
-        )
-    figure.plot(
-        x=series["precipitation"]["date"],
-        y=series["precipitation"]["value"],
-        region=precipitation_region,
-        projection=projection,
-        pen=str(cfg["precip_pen"]),
-    )
-
-    # Deformation supplies the visible west axis and the two-level time axis.
-    # The primary axis shows half-year dates. The secondary axis shows years;
-    # its default GMT 15p tick is disabled to avoid the long vertical marks.
-    deformation_region = [start, end, *cfg["defo_range"]]
-    with pygmt.config(FONT_ANNOT_PRIMARY=str(cfg["primary_time_font"])):
-        figure.basemap(
-            region=deformation_region,
-            projection=projection,
-            frame=["WSrt", str(cfg["x_primary_frame"])],
-        )
-    with pygmt.config(
-        MAP_TICK_LENGTH_SECONDARY=str(cfg["secondary_tick_length"]),
-        MAP_ANNOT_OFFSET_SECONDARY=str(cfg["secondary_annot_offset"]),
-    ):
-        figure.basemap(
-            region=deformation_region,
-            projection=projection,
-            frame=[
-                "WSrt",
-                f"{cfg['x_secondary_frame']}+l{cfg['time_label']}",
-                f"{cfg['defo_y_frame']}+l{cfg['defo_label']}",
-            ],
-        )
-    figure.plot(
-        x=series["deformation"]["date"],
-        y=series["deformation"]["value"],
-        region=deformation_region,
-        projection=projection,
-        style=str(cfg["defo_symbol"]),
-        fill=str(cfg["defo_color"]),
-        pen=str(cfg["defo_pen"]),
-    )
-    figure.plot(
-        x=series["fit"]["date"],
-        y=series["fit"]["value"],
-        region=deformation_region,
-        projection=projection,
-        pen=str(cfg["fit_pen"]),
-    )
-
-    destination = Path(str(cfg["output"]))
-    plotter.save(str(destination))
-    return destination
-
-
 def main(arguments: Sequence[str] | None = None) -> None:
     """Compile one cfg and execute its ordered auxiliary time-series layers."""
     args = build_parser().parse_args(arguments)
@@ -325,6 +221,10 @@ def main(arguments: Sequence[str] | None = None) -> None:
         sections = [layer.section for layer in plan.panels[0].layers]
         print(f"dry-run: layers={sections} output={cfg['output']}")
         return
+    from geodesy_visualization.figure_ops.timeseries_layers import (
+        TIMESERIES_HANDLERS,
+    )
+
     FigureExecutor(plan, handlers=TIMESERIES_HANDLERS).execute_plan()
     print(f"Saved: {cfg['output']}")
 
@@ -337,7 +237,6 @@ __all__ = [
     "load_series",
     "main",
     "read_date_value_table",
-    "render",
 ]
 
 

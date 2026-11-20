@@ -26,14 +26,29 @@ EXPECTED_GRID_PREPARATION_IMPORTS = {
 }
 
 EXPECTED_CANONICAL_GEO_IMPORTS = {
-    "src/geodesy_visualization/workflows/insar/deformation_map.py": {
+    "src/geodesy_visualization/figure_ops/deformation_layers.py": {
         "region_from_grd",
     },
     "src/geodesy_visualization/workflows/insar/deformation_profile.py": {
         "extract_profile",
         "generate_tracks",
-        "region_from_grd",
     },
+}
+
+PLAN_WORKFLOWS = {
+    "src/geodesy_visualization/workflows/cartography/study_area.py": "load_plan",
+    "src/geodesy_visualization/workflows/insar/deformation_map.py": (
+        "compile_deformation_maps"
+    ),
+    "src/geodesy_visualization/workflows/insar/deformation_profile.py": (
+        "compile_profile_figures"
+    ),
+    "src/geodesy_visualization/workflows/insar/timeseries_map.py": (
+        "compile_timeseries_map"
+    ),
+    "src/geodesy_visualization/workflows/insar/timeseries_aux.py": (
+        "compile_aux_timeseries"
+    ),
 }
 
 
@@ -81,6 +96,39 @@ def production_imports(module_name: str) -> dict[str, set[str]]:
 
 
 class OwnershipMapTests(unittest.TestCase):
+    def test_pygmt_workflows_compile_plans_without_compatibility_plotters(self) -> None:
+        """Keep workflow modules declarative and defer PyGMT imports to handlers."""
+        for relative, compiler in PLAN_WORKFLOWS.items():
+            text = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+            tree = ast.parse(text, filename=relative)
+            imported_modules = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            }
+            directly_imported = {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            with self.subTest(workflow=relative):
+                self.assertIn(compiler, text)
+                self.assertIn("FigureExecutor", text)
+                self.assertNotIn(
+                    "geodesy_visualization.backends.pygmt", imported_modules
+                )
+                self.assertNotIn("pygmt", directly_imported)
+                self.assertNotIn("PyGMTPlotter", text)
+
+    def test_compatibility_modules_do_not_modify_import_paths(self) -> None:
+        """Compatibility re-exports must rely on the installed package."""
+
+        for name in ("pygmt_geo.py", "pygmt_io.py", "pygmt_visual.py"):
+            text = (REPOSITORY_ROOT / "lib" / name).read_text(encoding="utf-8")
+            with self.subTest(module=name):
+                self.assertNotIn("sys.path", text)
+
     def test_documents_every_public_geo_function(self) -> None:
         """Require the migration map to change whenever the public API changes."""
         self.assertEqual(documented_functions(OWNERSHIP_MAP), public_api(GEO_MODULE))

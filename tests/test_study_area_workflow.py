@@ -29,6 +29,7 @@ class StudyAreaWorkflowTests(unittest.TestCase):
 
         self.assertTrue(EXAMPLE.is_file())
         self.assertFalse((REPOSITORY_ROOT / "config_examples/visualization").exists())
+        self.assertEqual(study_area.DEFAULT_CONFIG, EXAMPLE)
 
     def test_documented_example_loads_in_expected_order(self) -> None:
         """Resolve the distributable CFG and every text fixture from its directory."""
@@ -93,6 +94,12 @@ class StudyAreaWorkflowTests(unittest.TestCase):
             status = cli.main(["study-area", "--config", str(EXAMPLE), "--dry-run"])
         self.assertEqual(status, 0)
         workflow_main.assert_called_once_with(["--config", str(EXAMPLE), "--dry-run"])
+
+    def test_public_cli_uses_one_cfg_without_a_list_control_option(self) -> None:
+        """Keep caller-owned batch lists out of the Visualization CLI contract."""
+        parser = cli.build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["study-area", "--list", "jobs.list"])
 
 
 if __name__ == "__main__":
