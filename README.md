@@ -141,7 +141,7 @@ CFG 尽量直接沿用 `region`、`projection`、`grid`、`cmap`、`data`、`pen
 
 ```bash
 geodesy-visualization study-area \
-  --config <project>/config/4visualization/study_area_lt1.cfg
+  --config <project>/config/visualization/study_area_lt1.cfg
 ```
 
 ### 3.2 Deformation Map / 形变地图
@@ -160,12 +160,12 @@ its cfg and input data.
 统一位于 `config_examples/<workflow>/`。
 
 ```bash
-geodesy-visualization deformation-map --config <project>/config/4visualization/deformation_map.cfg
-geodesy-visualization study-area --config <project>/config/4visualization/study_area_lt1.cfg
-geodesy-visualization deformation-profile --config <project>/config/4visualization/deformation_profile.cfg
-geodesy-visualization timeseries-map --config <project>/config/4visualization/timeseries_map.cfg
-geodesy-visualization timeseries-aux --config <project>/config/4visualization/timeseries_aux.cfg
-geodesy-visualization baseline_plot --config <project>/config/4visualization/baseline_plot.cfg --case <name>
+geodesy-visualization deformation-map --config <project>/config/visualization/deformation_map.cfg
+geodesy-visualization study-area --config <project>/config/visualization/study_area_lt1.cfg
+geodesy-visualization deformation-profile --config <project>/config/visualization/deformation_profile.cfg
+geodesy-visualization timeseries-map --config <project>/config/visualization/timeseries_map.cfg
+geodesy-visualization timeseries-aux --config <project>/config/visualization/timeseries_aux.cfg
+geodesy-visualization baseline_plot --config <project>/config/visualization/baseline_plot.cfg --case <name>
 ```
 
 1. Read and validate the cfg file, including paths, units, color limits, transparency, and styles.<br>读取并校验 cfg 中的路径、单位、色标范围、透明度和样式。
@@ -334,22 +334,32 @@ conda run -n envPlot geodesy-visualization timeseries-aux \
 ### 5.6 InSAR Baseline Plot / InSAR 基线绘图
 
 Copy [the documented example cfg](config_examples/baseline_plot/baseline_plot.cfg) into the
-research project's `config/4visualization/` directory, set its project root,
-manifest and output, then run the installed command from any directory.
+research project's `config/visualization/` directory, set its project root,
+manifest and output. If you keep `python_font_dir`, update it to the actual
+single-family font directory or leave it blank to use the bundled default.
+Then run the installed command from any directory.
 
 将[已完整注释的配置示例](config_examples/baseline_plot/baseline_plot.cfg)复制到研究项目的
-`config/4visualization/` 目录，设置项目根目录、基线清单与输出路径，
-即可从任意目录执行：
+`config/visualization/` 目录，设置项目根目录、基线清单与输出路径。将
+`python_font_dir` 改为实际的单字体族目录，或留空使用内置默认字体。
+之后可从任意目录执行：
 
 ```bash
 /absolute/envPlot/bin/geodesy-visualization baseline_plot \
-  --config /absolute/PROJECT/config/4visualization/baseline_plot.cfg \
+  --config /absolute/PROJECT/config/visualization/baseline_plot.cfg \
   --case ascending
 ```
 
 Each example cfg documents every supported key, unit, valid choice, and output option. Unknown, duplicate, malformed, or inconsistent settings fail before plotting. Hex colors such as `#1f77b4` are accepted directly.
 
 每个示例 cfg 均说明支持的配置键、单位、可选值和输出选项。未知、重复、格式错误或相互矛盾的参数会在绘图前报错；可直接使用 `#1f77b4` 等十六进制颜色。
+
+When moving an example CFG, update paths to sample data and file-based CPT
+palettes. Relative file paths are resolved from the new CFG directory.
+GMT built-in palette names such as `vik` can be used directly.
+
+移动示例 CFG 后，更新示例数据和 CPT 文件的路径。相对文件路径从新 CFG
+所在目录解析，也可以直接使用 `vik` 等 GMT 内置色标名称。
 
 ## 6. Data And Output Behavior / 数据与输出行为
 

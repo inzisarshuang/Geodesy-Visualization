@@ -35,7 +35,7 @@ class VisualizationProjectLayoutTests(unittest.TestCase):
     def test_cfg_context_derives_default_and_explicit_output_wins(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            config = root / "config/4visualization/map.cfg"
+            config = root / "config/visualization/map.cfg"
             config.parent.mkdir(parents=True)
             values = {
                 "project_root": str(root),

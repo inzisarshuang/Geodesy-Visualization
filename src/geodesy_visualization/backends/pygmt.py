@@ -89,7 +89,7 @@ class PyGMTPlotter:
         self.cache_dir = (
             Path(cache_dir).expanduser().resolve()
             if cache_dir
-            else Path(tempfile.gettempdir()) / "pygmt-plotter-cache"
+            else Path(tempfile.gettempdir()) / "geodesy-visualization-cache"
         )
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
