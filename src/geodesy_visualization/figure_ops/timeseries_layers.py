@@ -72,34 +72,37 @@ def render_timeseries_frame(
         frame = [axes]
         if options["show_x"]:
             interval = float(options["longitude_interval"])
-            grid = f"g{interval:g}" if options["show_grid"] else ""
-            frame.append(f"xaf{interval:g}{grid}")
+            frame.append(f"xaf{interval:g}")
         if options["show_y"]:
             interval = float(options["latitude_interval"])
-            grid = f"g{interval:g}" if options["show_grid"] else ""
-            frame.append(f"yaf{interval:g}{grid}")
+            frame.append(f"yaf{interval:g}")
         from pygmt import config as pygmt_config
 
         with pygmt_config(
             FONT_ANNOT_PRIMARY=str(options["coordinate_font"]),
             FORMAT_GEO_MAP=str(options["coordinate_format"]),
             MAP_FRAME_TYPE="plain",
-            MAP_FRAME_PEN="0.7p,black",
+            MAP_FRAME_PEN=str(options["frame_pen"]),
         ):
             figure.basemap(region=region, projection=projection, frame=frame)
     west, east, south, north = region
     figure.plot(
         x=[west, east, east, west, west],
         y=[south, south, north, north, south],
-        pen="0.7p,black",
+        pen=str(options["frame_pen"]),
     )
+    if options["show_grid"]:
+        _plotter(context).draw_geo_grid(
+            region, projection, options["longitude_interval"],
+            options["latitude_interval"], str(options["grid_pen"]),
+        )
     if options["show_title"]:
         figure.text(
             x=(west + east) / 2,
             y=north,
             text=str(options["title"]),
             justify="BC",
-            offset="0p/6p",
+            offset=str(options["title_offset"]),
             no_clip=True,
             font=str(options["title_font"]),
         )
@@ -160,7 +163,7 @@ def render_timeseries_colorbar(
         context.figure.colorbar(
             cmap=True,
             position=(
-                f"JBC+o{options['offset']}+w{options['width']}"
+                f"{options['anchor']}+o{options['offset']}+w{options['width']}"
                 f"/{options['height']}+h"
             ),
             frame=[
@@ -186,22 +189,14 @@ def render_aux_axis(context: "RenderContext", operation: "LayerOperation") -> No
     variant = str(options["variant"])
     from pygmt import config as pygmt_config
 
-    if variant == "temperature":
-        with pygmt_config(
-            FONT_LABEL=str(options["color"]),
-            FONT_ANNOT_PRIMARY=str(options["color"]),
-        ):
-            context.figure.basemap(
-                region=region,
-                projection=projection,
-                frame=["E", f"{options['frame']}+l{options['axis_label']}"],
-            )
-    elif variant == "precipitation":
-        with pygmt_config(
-            FONT_LABEL=str(options["color"]),
-            FONT_ANNOT_PRIMARY=str(options["color"]),
-            MAP_ANNOT_OFFSET_PRIMARY="1.4c",
-        ):
+    if variant in ("temperature", "precipitation"):
+        axis_style = {
+            "FONT_LABEL": str(options["font_label"]),
+            "FONT_ANNOT_PRIMARY": str(options["font_annot_primary"]),
+        }
+        if options["annot_offset"]:
+            axis_style["MAP_ANNOT_OFFSET_PRIMARY"] = str(options["annot_offset"])
+        with pygmt_config(**axis_style):
             context.figure.basemap(
                 region=region,
                 projection=projection,
@@ -215,6 +210,13 @@ def render_aux_axis(context: "RenderContext", operation: "LayerOperation") -> No
                 frame=["WSrt", str(options["frame"])],
             )
     elif variant == "deformation_secondary":
+        frame = [
+            "WSrt",
+            f"{options['frame']}+l{options['time_label']}",
+            f"{options['y_frame']}+l{options['axis_label']}",
+        ]
+        if options["title"]:
+            frame[0] += f"+t{options['title']}"
         with pygmt_config(
             MAP_TICK_LENGTH_SECONDARY=str(options["secondary_tick_length"]),
             MAP_ANNOT_OFFSET_SECONDARY=str(options["secondary_annot_offset"]),
@@ -222,11 +224,7 @@ def render_aux_axis(context: "RenderContext", operation: "LayerOperation") -> No
             context.figure.basemap(
                 region=region,
                 projection=projection,
-                frame=[
-                    "WSrt",
-                    f"{options['frame']}+l{options['time_label']}",
-                    f"{options['y_frame']}+l{options['axis_label']}",
-                ],
+                frame=frame,
             )
     else:
         raise ValueError(f"[{operation.section}] unsupported auxiliary axis")
@@ -254,9 +252,10 @@ def render_aux_series(context: "RenderContext", operation: "LayerOperation") -> 
 def render_aux_legend(context: "RenderContext", operation: "LayerOperation") -> None:
     """Draw the optional combined auxiliary-series legend."""
     options = dict(operation.options)
-    context.figure.legend(
+    _plotter(context).add_legend(
         position=str(options["position"]),
         box=str(options["box"]),
+        font=str(options["font"]),
     )
 
 

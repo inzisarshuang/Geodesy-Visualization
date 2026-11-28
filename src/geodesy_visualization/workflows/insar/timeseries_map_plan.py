@@ -56,22 +56,22 @@ def _fonts(cfg: dict[str, object], panel_width: str) -> dict[str, str]:
 
     bold = bool(cfg["font_bold"])
     return {
-        "title": _scaled_font(
+        "title": str(cfg["panel_title_font"]) or _scaled_font(
             float(cfg["panel_title_font_size"]), cfg, panel_width, bold=bold
         ),
-        "tag": _scaled_font(
+        "tag": str(cfg["panel_number_font"]) or _scaled_font(
             float(cfg["panel_number_font_size"]), cfg, panel_width, bold=bold
         ),
-        "coordinate": _scaled_font(
+        "coordinate": str(cfg["coordinate_font"]) or _scaled_font(
             float(cfg["coordinate_font_size"]), cfg, panel_width, bold=bold
         ),
-        "colorbar_annotation": _scaled_font(
+        "colorbar_annotation": str(cfg["colorbar_font_annot_primary"]) or _scaled_font(
             float(cfg["colorbar_annotation_font_size"]),
             cfg,
             panel_width,
             bold=bold,
         ),
-        "colorbar_label": _scaled_font(
+        "colorbar_label": str(cfg["colorbar_font_label"]) or _scaled_font(
             float(cfg["colorbar_label_font_size"]), cfg, panel_width, bold=bold
         ),
     }
@@ -101,7 +101,11 @@ def compile_timeseries_map(
         "margins": [str(cfg["panel_margin_x"]), str(cfg["panel_margin_y"])],
     }
     if cfg["show_panel_number"]:
-        subplot["autolabel"] = f"{cfg['panel_number_style']}+jTL+o8p/8p+gwhite@70"
+        fill = f"+g{cfg['panel_number_fill']}" if cfg["panel_number_fill"] else ""
+        subplot["autolabel"] = (
+            f"{cfg['panel_number_style']}+j{cfg['panel_number_position']}"
+            f"+o{cfg['panel_number_offset']}{fill}"
+        )
 
     setup = _layer(
         "figure.setup.timeseries",
@@ -130,6 +134,18 @@ def compile_timeseries_map(
         show_y = mode == "all" or (mode == "outer" and column == 0)
         layers = (
             _layer(
+                f"figure.grdimage.background.epoch_{index + int(cfg['start_epoch']):03d}",
+                "timeseries_background",
+                {
+                    "mode": cfg["basemap_mode"],
+                    "tif": cfg["basemap_tif"],
+                    "dem_cpt": cfg["dem_cpt"],
+                    "dem_min": cfg["dem_bar_min"],
+                    "dem_max": cfg["dem_bar_max"],
+                },
+                0,
+            ),
+            _layer(
                 f"figure.basemap.epoch_{index + int(cfg['start_epoch']):03d}",
                 "timeseries_frame",
                 {
@@ -142,21 +158,12 @@ def compile_timeseries_map(
                     "longitude_interval": cfg["longitude_interval"],
                     "latitude_interval": cfg["latitude_interval"],
                     "show_grid": cfg["show_coordinate_grid"],
+                    "grid_pen": cfg["coordinate_grid_pen"],
                     "coordinate_format": cfg["coordinate_format"],
                     "title_font": fonts["title"],
+                    "title_offset": cfg["panel_title_offset"],
+                    "frame_pen": cfg["panel_frame_pen"],
                     "coordinate_font": fonts["coordinate"],
-                },
-                0,
-            ),
-            _layer(
-                f"figure.grdimage.background.epoch_{index + int(cfg['start_epoch']):03d}",
-                "timeseries_background",
-                {
-                    "mode": cfg["basemap_mode"],
-                    "tif": cfg["basemap_tif"],
-                    "dem_cpt": cfg["dem_cpt"],
-                    "dem_min": cfg["dem_bar_min"],
-                    "dem_max": cfg["dem_bar_max"],
                 },
                 1,
             ),
@@ -194,6 +201,7 @@ def compile_timeseries_map(
             "width": cfg["colorbar_width"],
             "height": cfg["colorbar_height"],
             "offset": cfg["colorbar_offset"],
+            "anchor": cfg["colorbar_anchor"],
             "box": cfg["colorbar_box"],
             "annotation_font": fonts["colorbar_annotation"],
             "label_font": fonts["colorbar_label"],

@@ -207,7 +207,8 @@ def render_meca(context: "RenderContext", operation: "FigureOperation") -> None:
         "extensionfill": options.pop("extensionfill", "white"),
         "pen": options.pop("pen", "1p,black"),
     }
-    options.pop("label", None)
+    if label := options.pop("label", ""):
+        kwargs["event_name"] = label
     kwargs.update(options)
     context.figure.meca(**kwargs)
 

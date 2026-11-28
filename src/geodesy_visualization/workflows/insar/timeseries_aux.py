@@ -27,6 +27,7 @@ from geodesy_visualization.io import (
     load_key_value_config,
     parse_bool,
     parse_float,
+    parse_int,
     resolve_output_path,
     resolve_publication_output_dir,
     resolve_project_dir,
@@ -56,12 +57,15 @@ ALLOWED_KEYS = {
     "time_label", "defo_symbol", "defo_pen", "fit_pen", "precip_pen", "temperature_pen",
     "x_primary_frame", "x_secondary_frame", "defo_y_frame", "precip_y_frame",
     "temperature_y_frame", "primary_time_font", "secondary_tick_length",
-    "secondary_annot_offset",
+    "secondary_annot_offset", "precip_annot_offset", "temperature_annot_offset",
+    "precip_font_annot_primary", "precip_font_label",
+    "temperature_font_annot_primary", "temperature_font_label",
+    "title", "frame_pen", "legend_font", "output_dpi",
     "add_legend", "legend_position", "legend_box",
     "defo_legend_label", "fit_legend_label",
     "precip_legend_label", "temperature_legend_label",
 }
-ALLOWED_KEYS.update(font_style_keys("default"))
+ALLOWED_KEYS.update(font_style_keys("default", include_secondary=True))
 
 
 # ---------------------------------------------------------------------------
@@ -129,9 +133,18 @@ def load_config(config_file: str) -> dict[str, object]:
         "defo_y_frame": get_optional(raw, "defo_y_frame", "ya10f5g10"),
         "precip_y_frame": get_optional(raw, "precip_y_frame", "ya30"),
         "temperature_y_frame": get_optional(raw, "temperature_y_frame", "ya10"),
-        "primary_time_font": get_optional(raw, "primary_time_font", "6p,TeX Gyre Heros"),
+        "primary_time_font": get_optional(raw, "primary_time_font", "6p,Helvetica"),
         "secondary_tick_length": get_optional(raw, "secondary_tick_length", "0p"),
         "secondary_annot_offset": get_optional(raw, "secondary_annot_offset", "18p"),
+        "title": get_optional(raw, "title"),
+        "precip_annot_offset": get_optional(raw, "precip_annot_offset", "1.4c"),
+        "temperature_annot_offset": get_optional(raw, "temperature_annot_offset"),
+        "precip_font_annot_primary": get_optional(raw, "precip_font_annot_primary"),
+        "precip_font_label": get_optional(raw, "precip_font_label"),
+        "temperature_font_annot_primary": get_optional(raw, "temperature_font_annot_primary"),
+        "temperature_font_label": get_optional(raw, "temperature_font_label"),
+        "legend_font": get_optional(raw, "legend_font"),
+        "output_dpi": parse_int(get_optional(raw, "output_dpi"), 300),
         "add_legend": parse_bool(get_optional(raw, "add_legend", "false")),
         "legend_position": get_optional(raw, "legend_position", "JTR+o0.2c/0.2c"),
         "legend_box": get_optional(raw, "legend_box", "+gwhite+p0.8p"),
@@ -149,14 +162,17 @@ def load_config(config_file: str) -> dict[str, object]:
             **parse_font_style(
                 raw,
                 "default",
-                "14p,TeX Gyre Heros-Bold",
-                "11p,TeX Gyre Heros",
-                "11p,TeX Gyre Heros",
+                "14p,Helvetica-Bold",
+                "11p,Helvetica",
+                "11p,Helvetica",
+                default_secondary="14p,Helvetica",
             ),
             "MAP_FRAME_TYPE": "plain",
-            "MAP_FRAME_PEN": "0.8p,black",
+            "MAP_FRAME_PEN": get_optional(raw, "frame_pen", "0.8p,black"),
         },
     }
+    if cfg["output_dpi"] < 1:
+        raise ValueError("output_dpi must be positive")
     for label, value in (
         ("defo", cfg["defo_range"]),
         ("precip", cfg["precip_range"]),

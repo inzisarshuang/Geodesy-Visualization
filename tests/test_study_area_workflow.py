@@ -59,7 +59,7 @@ class StudyAreaWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(
             by_section["figure.grdimage.dem"].options["grid"],
-            str((EXAMPLE.parent / "../deformation_map/data/dem.tif").resolve()),
+            str((EXAMPLE.parent / "../deformation_profile/data/DEM.tif").resolve()),
         )
 
     def test_dry_run_prints_order_and_does_not_create_executor(self) -> None:

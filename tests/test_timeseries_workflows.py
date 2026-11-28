@@ -50,6 +50,37 @@ class SpatialTimeSeriesTests(unittest.TestCase):
             self.assertEqual(cfg["cpt"], str((root / "palette.cpt").resolve()))
             self.assertTrue(cfg["font_bold"])
 
+    def test_coordinate_modes_control_annotations_independently_of_grid(self) -> None:
+        """Honor none, outer, and all without coupling them to the grid switch."""
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "map.cfg"
+            contents = (
+                "data_file = values.txt\ndates_file = dates.txt\n"
+                "data_source = TABLE\nrender_mode = Scatter\n"
+                "region_west = 0\nregion_east = 1\n"
+                "region_south = 0\nregion_north = 1\n"
+                "subplot_rows = 2\nsubplot_columns = 2\nend_epoch = 4\n"
+                "show_coordinate_grid = ON\nshow_panel_number = 0\n"
+            )
+            epochs = ([0.5], [0.5], [[1, 2, 3, 4]], ["20200101"] * 4)
+            for mode, expected in (
+                ("NONE", [(False, False)] * 4),
+                ("OUTER", [(False, True), (False, False), (True, True), (True, False)]),
+                ("ALL", [(True, True)] * 4),
+            ):
+                with self.subTest(coordinate_mode=mode):
+                    config.write_text(contents + f"coordinate_mode = {mode}\n", encoding="utf-8")
+                    cfg = spatial.load_config(str(config))
+                    plan = compile_timeseries_map(cfg, epochs)
+                    frames = [panel.layers[1].options for panel in plan.panels]
+                    self.assertEqual([(frame["show_x"], frame["show_y"]) for frame in frames], expected)
+                    self.assertTrue(all(frame["show_grid"] for frame in frames))
+                    self.assertNotIn("autolabel", plan.figure["subplot"])
+
+            config.write_text(contents + "coordinate_mode = auto\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "coordinate_mode"):
+                spatial.load_config(str(config))
+
     def test_selects_epochs_scales_and_preserves_missing_values(self) -> None:
         """Read only requested epochs and treat configured sentinels as missing."""
         with tempfile.TemporaryDirectory() as directory:
@@ -113,11 +144,11 @@ class SpatialTimeSeriesTests(unittest.TestCase):
         self.assertEqual([panel.identifier for panel in plan.panels], list(range(12)))
         self.assertEqual(
             [layer.handler for layer in plan.panels[0].layers],
-            ["timeseries_frame", "timeseries_background", "timeseries_epoch"],
+            ["timeseries_background", "timeseries_frame", "timeseries_epoch"],
         )
-        self.assertFalse(plan.panels[0].layers[0].options["show_x"])
-        self.assertTrue(plan.panels[0].layers[0].options["show_y"])
-        self.assertTrue(plan.panels[8].layers[0].options["show_x"])
+        self.assertFalse(plan.panels[0].layers[1].options["show_x"])
+        self.assertTrue(plan.panels[0].layers[1].options["show_y"])
+        self.assertTrue(plan.panels[8].layers[1].options["show_x"])
         self.assertEqual(
             plan.operations[0].options["series"],
             (cfg["bar_min"], cfg["bar_max"], cfg["bar_step"]),

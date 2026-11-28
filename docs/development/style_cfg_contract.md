@@ -117,11 +117,21 @@ interface, not a second execution engine.
 
 | Workflow | Shared font blocks | Specialized controls |
 |---|---|---|
-| Deformation map | `default`, `map` | target regions, map scale, rose, DEM/deformation CPT |
-| Deformation profile | `default`, `map`, `profile` | tracks, markers, profile legend and padding |
-| Auxiliary time series | `default` | primary/secondary time frames, three Y axes, and optional combined legend labels/geometry |
-| Spatial time-series map | `default` | responsive panel fonts, outer/all/none coordinates, subplot layout, colorbar geometry |
+| Deformation map | `default`, `map` | map frame and overlaid grid, axis names and offsets, target labels, scale, rose, colorbar typography and geometry |
+| Deformation profile | `default`, `map`, `profile` | same map styles as deformation map, with Cartesian ticks and profile legend font |
+| Auxiliary time series | `default` | title, primary/secondary time fonts, independent precipitation and temperature fonts, legend font |
+| Spatial time-series map | `default` | responsive panel and colorbar fonts, per-element fixed font overrides, grid, subplot layout |
 | Study area | Figure-operation sections | footprint/fault styles, sidecar layout, insets, meca, scalebar, directional rose |
+
+For the spatial time-series map, a full per-element font such as
+`panel_title_font` or `colorbar_font_annot_primary` takes precedence over the
+scaled size and `font_bold`. Leave the full font blank to use responsive sizing.
+The directional rose takes a label size; GMT supplies the built-in cardinal
+letter face.
+
+空间时序图中，`panel_title_font` 或 `colorbar_font_annot_primary` 等完整字体
+直接控制各自元素；留空时使用自适应字号和 `font_bold`。指北针可调方位字母字号，
+字形由 GMT 提供。
 
 ## 6. Migration Rule / 迁移规则
 

@@ -11,6 +11,8 @@ geodesy_visualization.figure_ops.deformation_layers
         建立地图范围与底图。
     ``render_deformation_data`` / ``render_deformation_targets``:
         绘制形变网格或散点以及目标区域标注。
+    ``render_deformation_grid``:
+        在栅格和形变图层之上叠加经纬格网。
     ``render_deformation_coverage``:
         绘制兼容 coverage 模式的影像 footprint 与 GNSS 点。
     ``render_deformation_colorbar`` / ``render_deformation_scale`` /
@@ -54,11 +56,14 @@ def render_deformation_basemap(
     context.projection = str(options["projection"])
     from pygmt import config as pygmt_config
 
-    pygmt_config(**dict(options["style"]))
+    style = dict(options["style"])
+    pygmt_config(**style)
     _plotter(context).draw_geo_basemap(
         region=list(context.region),
         projection=context.projection,
         title=str(options["title"]),
+        label_font=style.get("FONT_LABEL"),
+        **options["map_frame"],
     )
 
 
@@ -213,16 +218,24 @@ def render_deformation_coverage(
             )
 
 
+def render_deformation_grid(context: "RenderContext", operation: "LayerOperation") -> None:
+    """Draw geographic gridlines above the map data."""
+    options = dict(operation.options)
+    options.pop("enabled", None)
+    _plotter(context).draw_geo_grid(
+        region=list(context.region or ()),
+        projection=context.projection or "",
+        **options,
+    )
+
+
 def render_deformation_colorbar(
     context: "RenderContext", operation: "LayerOperation"
 ) -> None:
     """Draw the configured deformation colorbar against the active CPT."""
     options = dict(operation.options)
-    _plotter(context).add_colorbar(
-        label=str(options["label"]),
-        unit=str(options["unit"]),
-        tick_interval=options["tick_interval"],
-    )
+    options.pop("enabled", None)
+    _plotter(context).add_colorbar(**options)
 
 
 def render_deformation_scale(
@@ -245,9 +258,12 @@ def render_deformation_rose(
     context: "RenderContext", operation: "LayerOperation"
 ) -> None:
     """Draw the standard directional rose in the active map scope."""
+    options = dict(operation.options)
+    options.pop("enabled", None)
     _plotter(context).add_rose(
         region=list(context.region or ()),
         projection=context.projection or "",
+        **options,
     )
 
 
@@ -257,6 +273,7 @@ DEFORMATION_HANDLERS: dict[str, Callable] = {
     "deformation_data": render_deformation_data,
     "deformation_targets": render_deformation_targets,
     "deformation_coverage": render_deformation_coverage,
+    "deformation_grid": render_deformation_grid,
     "deformation_colorbar": render_deformation_colorbar,
     "deformation_scale": render_deformation_scale,
     "deformation_rose": render_deformation_rose,
@@ -270,6 +287,7 @@ __all__ = [
     "render_deformation_colorbar",
     "render_deformation_coverage",
     "render_deformation_data",
+    "render_deformation_grid",
     "render_deformation_rose",
     "render_deformation_scale",
     "render_deformation_targets",

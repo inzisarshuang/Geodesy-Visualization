@@ -19,7 +19,10 @@ geodesy_visualization.figure_ops.direct_operations
 
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -61,15 +64,24 @@ def render_basemap(context: "RenderContext", operation: "FigureOperation") -> No
     options = dict(operation.options)
     context.region = tuple(options["region"])
     context.projection = str(options["projection"])
-    font_options = {}
+    gmt_style = {}
     for key, gmt_key in (
         ("font_title", "FONT_TITLE"),
         ("font_annot_primary", "FONT_ANNOT_PRIMARY"),
         ("font_label", "FONT_LABEL"),
+        ("format_geo_map", "FORMAT_GEO_MAP"),
+        ("map_frame_type", "MAP_FRAME_TYPE"),
+        ("map_frame_width", "MAP_FRAME_WIDTH"),
+        ("map_frame_pen", "MAP_FRAME_PEN"),
+        ("map_tick_pen", "MAP_TICK_PEN"),
     ):
         value = options.pop(key, None)
         if value:
-            font_options[gmt_key] = str(value)
+            gmt_style[gmt_key] = str(value)
+    x_label = options.pop("x_label", "")
+    y_label = options.pop("y_label", "")
+    x_offset = options.pop("x_label_offset", "0c/-1c")
+    y_offset = options.pop("y_label_offset", "-2.3c/0c")
     title = options.pop("title", None)
     if title:
         frame = options.get("frame", "af")
@@ -77,13 +89,21 @@ def render_basemap(context: "RenderContext", operation: "FigureOperation") -> No
             options["frame"] = [*frame, f'+t"{title}"']
         else:
             options["frame"] = [frame, f'+t"{title}"']
-    if font_options:
+    if gmt_style:
         from pygmt import config as pygmt_config
 
-        with pygmt_config(**font_options):
+        with pygmt_config(**gmt_style):
             context.figure.basemap(**options)
     else:
         context.figure.basemap(**options)
+    if x_label or y_label:
+        from geodesy_visualization.backends.pygmt import PyGMTPlotter
+
+        plotter = PyGMTPlotter()
+        plotter.fig = context.figure
+        plotter.add_geo_axis_labels(
+            x_label, y_label, gmt_style.get("FONT_LABEL"), x_offset, y_offset
+        )
 
 
 def render_grdimage(context: "RenderContext", operation: "FigureOperation") -> None:
@@ -144,7 +164,10 @@ def render_scalebar(context: "RenderContext", operation: "FigureOperation") -> N
     _reject_unsupported_legacy(
         operation,
         options,
-        frozenset({"position", "length", "fancy", "unit", "label", "box"}),
+        frozenset({
+            "position", "length", "fancy", "unit", "label", "box",
+            "label_alignment", "scale_loc", "transparency",
+        }),
     )
     raw = f"{_position_code(options.pop('position'))}+w{options.pop('length')}"
     if options.pop("fancy", False):
@@ -154,14 +177,18 @@ def render_scalebar(context: "RenderContext", operation: "FigureOperation") -> N
     label = options.pop("label", False)
     if isinstance(label, str) and label:
         raw += f"+l{label}"
+    if alignment := options.pop("label_alignment", ""):
+        raw += f"+a{alignment}"
+    if location := options.pop("scale_loc", ""):
+        raw += f"+c{location}"
     box = options.pop("box", False)
     if font_options:
         from pygmt import config as pygmt_config
 
         with pygmt_config(**font_options):
-            context.figure.basemap(map_scale=raw, box=box or None)
+            context.figure.basemap(map_scale=raw, box=box or None, **options)
     else:
-        context.figure.basemap(map_scale=raw, box=box or None)
+        context.figure.basemap(map_scale=raw, box=box or None, **options)
 
 
 def render_directional_rose(
@@ -170,21 +197,32 @@ def render_directional_rose(
 ) -> None:
     """Render a directional rose through the current method or legacy basemap."""
     options = _without(dict(operation.options), "enabled")
+    label_size = options.pop("label_size", "")
     method = getattr(context.figure, "directional_rose", None)
-    if callable(method):
+    if not callable(method):
+        _reject_unsupported_legacy(
+            operation,
+            options,
+            frozenset({"position", "width", "kind", "box", "labels", "offset", "transparency"}),
+        )
+        raw = f"{_position_code(options.pop('position'))}+w{options.pop('width')}"
+        if kind := options.pop("kind", ""):
+            raw += f"+{kind}"
+        if labels := options.pop("labels", ""):
+            raw += f"+l{labels}"
+        if offset := options.pop("offset", ""):
+            raw += f"+o{offset}"
+        options["rose"] = raw
+        options["box"] = options.get("box") or None
+        method = context.figure.basemap
+
+    label_style = nullcontext()
+    if label_size:
+        from pygmt import config as pygmt_config
+
+        label_style = pygmt_config(FONT_TITLE=str(label_size))
+    with label_style:
         method(**options)
-        return
-    _reject_unsupported_legacy(
-        operation,
-        options,
-        frozenset({"position", "width", "kind", "box"}),
-    )
-    raw = f"{_position_code(options.pop('position'))}+w{options.pop('width')}"
-    kind = options.pop("kind", "")
-    if kind:
-        raw += f"+{kind}"
-    box = options.pop("box", False)
-    context.figure.basemap(rose=raw, box=box or None)
 
 
 def render_colorbar(context: "RenderContext", operation: "FigureOperation") -> None:
@@ -205,6 +243,11 @@ def render_colorbar(context: "RenderContext", operation: "FigureOperation") -> N
         position += f"+w{length or '80%'}"
         if width:
             position += f"/{width}"
+    if options.pop("reverse", False):
+        # Older GMT versions express reversal as a negative length.
+        position, length_count = re.subn(r"\+w-?(?=[0-9.])", "+w-", position)
+        if not length_count:
+            position += "+w-80%"
     position += "+v" if orientation == "vertical" else "+h"
     options["position"] = position
     label = options.pop("label", None)

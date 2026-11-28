@@ -151,6 +151,14 @@ The deformation-map workflow prepares plot-ready GeoTIFF or standardized lon/lat
 形变地图 workflow 将已准备的 GeoTIFF 或标准经纬度 TXT 临时生成 GMT GRD，
 并叠加到 DEM、光学影像或空白底图。
 
+Use `map_font_title` for the title and `map_font_annot_primary` for longitude and latitude ticks. `map_font_label` applies to names set by `map_x_label` and `map_y_label`. For GMT text such as `16p,Helvetica-Bold,black`, choose `Helvetica` for regular weight or `Helvetica-Bold` for bold.
+
+`map_font_title` 控制图题，`map_font_annot_primary` 控制经纬度刻度。`map_font_label` 控制 `map_x_label` 与 `map_y_label` 所设置的轴名。GMT 字体规格示例为 `16p,Helvetica-Bold,black`，常规和粗体分别使用 `Helvetica` 和 `Helvetica-Bold`。
+
+Each example CFG explains the purpose, units, and activation conditions next to its settings. Deformation maps and profiles share map style keys. Spatial time-series panels support responsive fonts and explicit per-element font overrides. See the [style CFG contract](docs/development/style_cfg_contract.md).
+
+各示例 CFG 在参数旁说明用途、单位和生效条件。形变地图和剖面地图共享地图样式参数。空间时序图支持自适应字号，各元素也可单独指定完整字体。[样式 CFG 契约](docs/development/style_cfg_contract.md)
+
 The installed `geodesy-visualization` command is the formal workflow
 orchestrator. All runnable examples are kept under
 `config_examples/<workflow>/`, with each directory containing
@@ -266,6 +274,12 @@ gdal_translate --version
 
 ## 5. Quick Start / 快速开始
 
+Select a workflow with `--config` and use `--dry-run` to check its inputs and
+output path. Baseline configurations can select a named case with `--case`.
+
+用 `--config` 指定所选工作流的配置，`--dry-run` 检查输入和输出路径。
+基线图配置支持用 `--case` 选择命名配置段。
+
 Paths inside a cfg file are resolved from the declared project context rather than the shell's current directory. An explicit `output_dir` remains authoritative; otherwise `project_root`, `project`, and `processing_root` derive `FIGURES/PUBLICATION/<WORKFLOW>`.
 
 cfg 中的路径按声明的项目上下文解析，而不是终端当前目录；显式 `output_dir` 优先，否则由项目、case 和方法根自动生成 `FIGURES/PUBLICATION/<WORKFLOW>`。
@@ -335,12 +349,14 @@ conda run -n envPlot geodesy-visualization timeseries-aux \
 
 Copy [the documented example cfg](config_examples/baseline_plot/baseline_plot.cfg) into the
 research project's `config/visualization/` directory, set its project root,
-manifest and output. If you keep `python_font_dir`, update it to the actual
+manifest and `output_file` (legacy `output` remains accepted). MATLAB uses its
+own `matlab_output`. If you keep `python_font_dir`, update it to the actual
 single-family font directory or leave it blank to use the bundled default.
 Then run the installed command from any directory.
 
 将[已完整注释的配置示例](config_examples/baseline_plot/baseline_plot.cfg)复制到研究项目的
-`config/visualization/` 目录，设置项目根目录、基线清单与输出路径。将
+`config/visualization/` 目录，设置项目根目录、基线清单与 `output_file`
+（兼容旧的 `output`）。MATLAB 仍使用独立的 `matlab_output`。将
 `python_font_dir` 改为实际的单字体族目录，或留空使用内置默认字体。
 之后可从任意目录执行：
 

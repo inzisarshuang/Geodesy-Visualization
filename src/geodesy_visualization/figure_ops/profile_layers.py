@@ -72,6 +72,9 @@ def render_profile_basemap(context: "RenderContext", operation: "LayerOperation"
         y_label=str(options["y_label"]),
         padding=float(options["padding"]),
         projection=context.projection,
+        x_frame=str(options["x_frame"]),
+        y_frame=str(options["y_frame"]),
+        frame_pen=str(options["frame_pen"]),
     )
 
 
@@ -104,6 +107,7 @@ def render_profile_legend(context: "RenderContext", operation: "LayerOperation")
     _plotter(context).add_legend(
         position=str(options["position"]),
         box=str(options["box"]),
+        font=str(options["font"]),
     )
 
 

@@ -337,6 +337,46 @@ class FigureOperationConfigTests(unittest.TestCase):
             plan = load_figure_plan(cfg)
             self.assertIs(plan.operations[0].options["enabled"], False)
 
+    def test_cfg_distinguishes_switches_from_gmt_style_strings(self) -> None:
+        """Keep Boolean aliases typed while passing native panel and mask syntax through."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "dem.grd").touch()
+            for token, expected in (("ON", True), ("0", False), ("+z0", "+z0")):
+                with self.subTest(nan_transparent=token):
+                    cfg = self.write_cfg(
+                        root,
+                        f"""
+                        [figure]
+                        layout = publication_sidecar
+                        [figure.grdimage.dem]
+                        grid = dem.grd
+                        cmap = gray
+                        nan_transparent = {token}
+                        [figure.scalebar]
+                        position = TR
+                        length = 50k
+                        box = F+gwhite+p1p
+                        fancy = Off
+                        [figure.savefig]
+                        fname = result.png
+                        crop = 1
+                        """,
+                    )
+                    raster, scale, save = load_figure_plan(cfg).operations
+                    self.assertEqual(raster.options["nan_transparent"], expected)
+                    self.assertIs(type(raster.options["nan_transparent"]), type(expected))
+                    self.assertIs(scale.options["fancy"], False)
+                    self.assertEqual(scale.options["box"], "F+gwhite+p1p")
+                    self.assertIs(save.options["crop"], True)
+
+            cfg.write_text(
+                cfg.read_text(encoding="utf-8").replace("fancy = Off", "fancy = y"),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, r"\[figure.scalebar\] fancy"):
+                load_figure_plan(cfg)
+
 
 if __name__ == "__main__":
     unittest.main()

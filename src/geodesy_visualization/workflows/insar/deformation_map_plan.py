@@ -40,7 +40,6 @@ def _layer(
 def _deformation_plan(cfg: dict, name: str, dataset: dict) -> FigurePlan:
     """Compile one normalized deformation dataset into visible ordered layers."""
     region = tuple(cfg["region"]) if cfg["region"] is not None else None
-    style = {**cfg["default_style"], **cfg["map_style"]}
     layers: list[LayerOperation] = []
 
     def add(section: str, handler: str, options: dict[str, object]) -> None:
@@ -55,7 +54,8 @@ def _deformation_plan(cfg: dict, name: str, dataset: dict) -> FigurePlan:
             "region_grid": dataset["grd_path"],
             "projection": cfg["projection"],
             "title": dataset["title"],
-            "style": style,
+            "style": cfg["map_style"],
+            "map_frame": cfg["map_frame"],
         },
     )
     add(
@@ -86,6 +86,7 @@ def _deformation_plan(cfg: dict, name: str, dataset: dict) -> FigurePlan:
             "clip_kml": cfg["clip_kml"],
         },
     )
+    add(f"figure.basemap.grid.{name}", "deformation_grid", cfg["map_grid_options"])
     add(
         f"figure.plot.targets.{name}",
         "deformation_targets",
@@ -104,7 +105,7 @@ def _deformation_plan(cfg: dict, name: str, dataset: dict) -> FigurePlan:
             "enabled": cfg["add_colorbar"],
             "label": cfg["defo_colorbar_label"],
             "unit": cfg["defo_colorbar_unit"],
-            "tick_interval": cfg["defo_colorbar_tick_interval"] or None,
+            **cfg["defo_colorbar_style"],
         },
     )
     add(
@@ -122,12 +123,12 @@ def _deformation_plan(cfg: dict, name: str, dataset: dict) -> FigurePlan:
     add(
         f"figure.directional_rose.{name}",
         "deformation_rose",
-        {"enabled": cfg["add_rose"]},
+        {"enabled": cfg["add_rose"], **cfg["map_rose_options"]},
     )
     add(
         "figure.savefig",
         "savefig",
-        {"fname": dataset["output"], "dpi": 300},
+        {"fname": dataset["output"], "dpi": cfg["output_dpi"]},
     )
     return FigurePlan(
         config_path=Path(cfg["config_path"]),
@@ -139,7 +140,6 @@ def _deformation_plan(cfg: dict, name: str, dataset: dict) -> FigurePlan:
 
 def _coverage_plan(cfg: dict) -> FigurePlan:
     """Compile the compatibility coverage mode into the same layer model."""
-    style = {**cfg["default_style"], **cfg["map_style"]}
     layers = (
         _layer(
             "figure.basemap.coverage",
@@ -149,7 +149,8 @@ def _coverage_plan(cfg: dict) -> FigurePlan:
                 "region_grid": "",
                 "projection": cfg["projection"],
                 "title": cfg["coverage_title"],
-                "style": style,
+                "style": cfg["map_style"],
+                "map_frame": cfg["map_frame"],
             },
             0,
         ),
@@ -158,6 +159,12 @@ def _coverage_plan(cfg: dict) -> FigurePlan:
             "deformation_background",
             {"mode": "optic", "optic_tif": cfg["optic_tif"]},
             1,
+        ),
+        _layer(
+            "figure.basemap.grid.coverage",
+            "deformation_grid",
+            cfg["map_grid_options"],
+            2,
         ),
         _layer(
             "figure.plot.coverage",
@@ -172,7 +179,7 @@ def _coverage_plan(cfg: dict) -> FigurePlan:
                 "gnss_label_font": cfg["gnss_label_font"],
                 "gnss_label_offset": cfg["gnss_label_offset"],
             },
-            2,
+            3,
         ),
         _layer(
             "figure.scalebar.coverage",
@@ -185,19 +192,19 @@ def _coverage_plan(cfg: dict) -> FigurePlan:
                 "font_annot": cfg["map_scale_font_annot"],
                 "font_label": cfg["map_scale_font_label"],
             },
-            3,
+            4,
         ),
         _layer(
             "figure.directional_rose.coverage",
             "deformation_rose",
-            {"enabled": cfg["add_rose"]},
-            4,
+            {"enabled": cfg["add_rose"], **cfg["map_rose_options"]},
+            5,
         ),
         _layer(
             "figure.savefig",
             "savefig",
-            {"fname": cfg["coverage_output"], "dpi": 300},
-            5,
+            {"fname": cfg["coverage_output"], "dpi": cfg["output_dpi"]},
+            6,
         ),
     )
     return FigurePlan(

@@ -66,7 +66,9 @@ def compile_aux_timeseries(
             "range": tuple(cfg["temperature_range"]),
             "frame": cfg["temperature_y_frame"],
             "axis_label": cfg["temperature_label"],
-            "color": cfg["temperature_color"],
+            "font_annot_primary": cfg["temperature_font_annot_primary"] or cfg["temperature_color"],
+            "font_label": cfg["temperature_font_label"] or cfg["temperature_color"],
+            "annot_offset": cfg["temperature_annot_offset"],
         },
     )
     add(
@@ -93,7 +95,9 @@ def compile_aux_timeseries(
             "range": tuple(cfg["precip_range"]),
             "frame": cfg["precip_y_frame"],
             "axis_label": cfg["precip_label"],
-            "color": cfg["precip_color"],
+            "font_annot_primary": cfg["precip_font_annot_primary"] or cfg["precip_color"],
+            "font_label": cfg["precip_font_label"] or cfg["precip_color"],
+            "annot_offset": cfg["precip_annot_offset"],
         },
     )
     add(
@@ -135,6 +139,7 @@ def compile_aux_timeseries(
             "axis_label": cfg["defo_label"],
             "y_frame": cfg["defo_y_frame"],
             "time_label": cfg["time_label"],
+            "title": cfg["title"],
             "secondary_tick_length": cfg["secondary_tick_length"],
             "secondary_annot_offset": cfg["secondary_annot_offset"],
         },
@@ -175,6 +180,7 @@ def compile_aux_timeseries(
         {
             "enabled": cfg["add_legend"],
             "position": cfg["legend_position"],
+            "font": cfg["legend_font"],
             "box": cfg["legend_box"],
         },
     )
@@ -193,7 +199,7 @@ def compile_aux_timeseries(
     save = _layer(
         "figure.savefig",
         "savefig",
-        {"fname": cfg["output"], "dpi": 300},
+        {"fname": cfg["output"], "dpi": cfg["output_dpi"]},
         0,
     )
     return FigurePlan(

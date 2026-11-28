@@ -54,10 +54,12 @@ from geodesy_visualization.io import (
     validate_same_length,
 )
 from geodesy_visualization.styles import (
+    DEFORMATION_MAP_STYLE_KEYS,
     colorbar_metadata_keys,
     font_style_keys,
     parse_colorbar_metadata,
-    parse_font_style,
+    parse_deformation_map_style,
+    parse_scoped_font_style,
     resolve_cpt_reference,
 )
 from geodesy_visualization.figure_ops.executor import FigureExecutor
@@ -84,9 +86,10 @@ ALLOWED_KEYS = {
     "track_end_suffix", "marker_lon", "marker_lat", "marker_style", "marker_pen", "marker_fill",
     "export_line_profiles", "export_scatter_profiles", "profile_title_prefix",
     "profile_x_label", "profile_y_label", "profile_padding", "profile_projection",
-    "profile_legend_position", "profile_legend_box",
+    "profile_x_frame", "profile_y_frame", "profile_frame_pen",
+    "profile_add_legend", "profile_legend_position", "profile_legend_box", "profile_legend_font",
 }
-ALLOWED_KEYS.update(colorbar_metadata_keys("defo"))
+ALLOWED_KEYS.update(colorbar_metadata_keys("defo") | DEFORMATION_MAP_STYLE_KEYS)
 for _style_prefix in ("default", "map", "profile"):
     ALLOWED_KEYS.update(font_style_keys(_style_prefix))
 for _prefix in ("dataset1", "dataset2"):
@@ -222,38 +225,29 @@ def load_config(config_path: str) -> dict:
         "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p2p+c20p/20p"),
         "map_scale_height": get_optional(cfg, "map_scale_height", "20p"),
         "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "20p"),
-        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,TeX Gyre Heros-Bold,black"),
+        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,Helvetica-Bold,black"),
         "add_rose": parse_bool(get_optional(cfg, "add_rose", ""), True),
-        "default_style": parse_font_style(
-            cfg,
-            "default",
-            "24p,TeX Gyre Heros-Bold",
-            "12p,TeX Gyre Heros-Bold",
-            "20p,TeX Gyre Heros-Bold",
+        **parse_deformation_map_style(cfg),
+        "map_style": parse_scoped_font_style(
+            cfg, "map", ("28p,Helvetica-Bold", "14p,Helvetica-Bold", "28p,Helvetica-Bold")
         ),
-        "map_style": parse_font_style(
-            cfg,
-            "map",
-            "28p,TeX Gyre Heros-Bold",
-            "14p,TeX Gyre Heros-Bold",
-            "28p,TeX Gyre Heros-Bold",
-        ),
-        "profile_style": parse_font_style(
-            cfg,
-            "profile",
-            "20p,TeX Gyre Heros-Bold",
-            "12p,TeX Gyre Heros",
-            "16p,TeX Gyre Heros",
+        "profile_style": parse_scoped_font_style(
+            cfg, "profile", ("20p,Helvetica-Bold", "12p,Helvetica", "16p,Helvetica")
         ),
         "profile_title_prefix": get_optional(cfg, "profile_title_prefix", "Profile"),
         "profile_x_label": get_optional(cfg, "profile_x_label", "Distance (m)"),
         "profile_y_label": get_optional(cfg, "profile_y_label", "Deformation (m)"),
         "profile_padding": parse_float(get_optional(cfg, "profile_padding", ""), 0.1),
         "profile_projection": get_optional(cfg, "profile_projection", "X16c/10c"),
+        "profile_x_frame": get_optional(cfg, "profile_x_frame", "af"),
+        "profile_y_frame": get_optional(cfg, "profile_y_frame", "af"),
+        "profile_frame_pen": get_optional(cfg, "profile_frame_pen"),
+        "profile_add_legend": parse_bool(get_optional(cfg, "profile_add_legend"), True),
+        "profile_legend_font": get_optional(cfg, "profile_legend_font"),
         "profile_legend_position": get_optional(cfg, "profile_legend_position", "JTR+o0.5c/-1.2c"),
         "profile_legend_box": get_optional(cfg, "profile_legend_box", "+gwhite+p1.5p"),
         "track_line_pen": get_optional(cfg, "track_line_pen", "2p,black"),
-        "track_label_font": get_optional(cfg, "track_label_font", "20p,TeX Gyre Heros-Bold"),
+        "track_label_font": get_optional(cfg, "track_label_font", "20p,Helvetica-Bold"),
         "track_start_justify": get_optional(cfg, "track_start_justify", "BR"),
         "track_end_justify": get_optional(cfg, "track_end_justify", "BL"),
         "track_end_suffix": get_optional(cfg, "track_end_suffix", "'"),

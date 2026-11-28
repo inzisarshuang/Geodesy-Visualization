@@ -162,6 +162,57 @@ output = VISUALIZATION/baseline.png
         self.assertEqual(case.y_tick_interval, 100.0)
         self.assertTrue(case.show_grid)
 
+    def test_normalizes_shared_baseline_display_choices(self) -> None:
+        """Accept all shared date units and Boolean spelling pairs."""
+        with tempfile.TemporaryDirectory() as directory:
+            root, manifest, config = self._project(directory)
+            for token, weight, unit, expected_grid in (
+                ("TrUE", "BOLD", "DAY", True),
+                ("YES", "NORMAL", "MONTH", True),
+                ("On", "BOLD", "YEAR", True),
+                ("1", "NORMAL", "DAY", True),
+                ("FaLsE", "BOLD", "MONTH", False),
+                ("No", "NORMAL", "YEAR", False),
+                ("OFF", "BOLD", "DAY", False),
+                ("0", "NORMAL", "MONTH", False),
+            ):
+                with self.subTest(show_grid=token, date_tick_unit=unit):
+                    config.write_text(
+                        "[project]\nroot = ../..\n[case:main]\n"
+                        f"baseline_manifest = {manifest.relative_to(root)}\n"
+                        "output_file = FIGURES/baseline.png\n"
+                        f"show_grid = {token}\nfont_weight = {weight}\n"
+                        f"date_tick_unit = {unit}\ndate_format = %Y/%m.%d\n",
+                        encoding="utf-8",
+                    )
+                    (case,) = load_baseline_plot_config(config)
+                    self.assertIs(case.show_grid, expected_grid)
+                    self.assertEqual(case.font_weight, weight.lower())
+                    self.assertEqual(case.date_tick_unit, unit.lower())
+                    self.assertEqual(case.date_format, "%Y/%m.%d")
+
+    def test_output_file_and_legacy_output_follow_case_precedence(self) -> None:
+        """Accept the standard output key and keep legacy case overrides."""
+        with tempfile.TemporaryDirectory() as directory:
+            root, manifest, config = self._project(directory)
+            config.write_text(
+                "[project]\n"
+                "root = ../..\n"
+                "[defaults]\n"
+                "output_file = FIGURES/default.png\n"
+                "[case:current]\n"
+                f"baseline_manifest = {manifest.relative_to(root)}\n"
+                "output = FIGURES/ignored.png\n"
+                "output_file = FIGURES/current.png\n"
+                "[case:legacy]\n"
+                f"baseline_manifest = {manifest.relative_to(root)}\n"
+                "output = FIGURES/legacy.png\n",
+                encoding="utf-8",
+            )
+            current, legacy = load_baseline_plot_config(config)
+            self.assertEqual(current.output, root / "FIGURES/current.png")
+            self.assertEqual(legacy.output, root / "FIGURES/legacy.png")
+
     def test_single_case_does_not_require_name_but_multiple_cases_do(self) -> None:
         """Catch silently selecting an arbitrary case from a multi-case cfg."""
 

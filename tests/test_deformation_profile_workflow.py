@@ -63,6 +63,7 @@ class DeformationProfileWorkflowTests(unittest.TestCase):
                 "deformation_basemap",
                 "deformation_background",
                 "deformation_data",
+                "deformation_grid",
                 "profile_tracks",
                 "profile_marker",
                 "deformation_colorbar",
@@ -72,9 +73,9 @@ class DeformationProfileWorkflowTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            list(first_map.operations[3].options["tracks"]), list(cfg["track_names"])
+            list(first_map.operations[4].options["tracks"]), list(cfg["track_names"])
         )
-        marker = first_map.operations[4].options
+        marker = first_map.operations[5].options
         self.assertEqual(marker["longitude"], cfg["marker_lon"])
         self.assertEqual(marker["latitude"], cfg["marker_lat"])
         self.assertEqual(marker["style"], cfg["marker_style"])

@@ -39,7 +39,6 @@ def _layer(
 
 def _map_plan(cfg: dict, name: str, dataset: dict, tracks: dict) -> FigurePlan:
     """Compile one deformation dataset map with common tracks and marker."""
-    map_style = {**cfg["default_style"], **cfg["map_style"]}
     layers = (
         _layer(
             f"figure.basemap.{name}",
@@ -49,7 +48,8 @@ def _map_plan(cfg: dict, name: str, dataset: dict, tracks: dict) -> FigurePlan:
                 "region_grid": dataset["grd_path"],
                 "projection": cfg["projection"],
                 "title": dataset["title"],
-                "style": map_style,
+                "style": cfg["map_style"],
+                "map_frame": cfg["map_frame"],
             },
             0,
         ),
@@ -83,6 +83,12 @@ def _map_plan(cfg: dict, name: str, dataset: dict, tracks: dict) -> FigurePlan:
             2,
         ),
         _layer(
+            f"figure.basemap.grid.{name}",
+            "deformation_grid",
+            cfg["map_grid_options"],
+            3,
+        ),
+        _layer(
             f"figure.plot.profile_tracks.{name}",
             "profile_tracks",
             {
@@ -93,7 +99,7 @@ def _map_plan(cfg: dict, name: str, dataset: dict, tracks: dict) -> FigurePlan:
                 "end_justify": cfg["track_end_justify"],
                 "end_suffix": cfg["track_end_suffix"],
             },
-            3,
+            4,
         ),
         _layer(
             f"figure.plot.marker.{name}",
@@ -106,7 +112,7 @@ def _map_plan(cfg: dict, name: str, dataset: dict, tracks: dict) -> FigurePlan:
                 "pen": cfg["marker_pen"],
                 "fill": cfg["marker_fill"] or None,
             },
-            4,
+            5,
         ),
         _layer(
             f"figure.colorbar.deformation.{name}",
@@ -115,9 +121,9 @@ def _map_plan(cfg: dict, name: str, dataset: dict, tracks: dict) -> FigurePlan:
                 "enabled": cfg["add_colorbar"],
                 "label": cfg["defo_colorbar_label"],
                 "unit": cfg["defo_colorbar_unit"],
-                "tick_interval": None,
+                **cfg["defo_colorbar_style"],
             },
-            5,
+            6,
         ),
         _layer(
             f"figure.scalebar.{name}",
@@ -130,19 +136,19 @@ def _map_plan(cfg: dict, name: str, dataset: dict, tracks: dict) -> FigurePlan:
                 "font_annot": cfg["map_scale_font_annot"],
                 "font_label": cfg["map_scale_font_label"],
             },
-            6,
+            7,
         ),
         _layer(
             f"figure.directional_rose.{name}",
             "deformation_rose",
-            {"enabled": cfg["add_rose"]},
-            7,
+            {"enabled": cfg["add_rose"], **cfg["map_rose_options"]},
+            8,
         ),
         _layer(
             "figure.savefig",
             "savefig",
-            {"fname": dataset["output_map"], "dpi": 300},
-            8,
+            {"fname": dataset["output_map"], "dpi": cfg["output_dpi"]},
+            9,
         ),
     )
     return FigurePlan(
@@ -161,7 +167,6 @@ def _profile_plan(
     track_profiles: tuple[object, ...],
 ) -> FigurePlan:
     """Compile one line or scatter comparison into Cartesian layers."""
-    style = {**cfg["default_style"], **cfg["profile_style"]}
     layers: list[LayerOperation] = [
         _layer(
             f"figure.basemap.profile.{track_name}.{mode}",
@@ -173,7 +178,10 @@ def _profile_plan(
                 "y_label": cfg["profile_y_label"],
                 "padding": cfg["profile_padding"],
                 "projection": cfg["profile_projection"],
-                "style": style,
+                "style": cfg["profile_style"],
+                "x_frame": cfg["profile_x_frame"],
+                "y_frame": cfg["profile_y_frame"],
+                "frame_pen": cfg["profile_frame_pen"],
             },
             0,
         )
@@ -201,6 +209,8 @@ def _profile_plan(
             f"figure.legend.profile.{track_name}.{mode}",
             "profile_legend",
             {
+                "enabled": cfg["profile_add_legend"],
+                "font": cfg["profile_legend_font"],
                 "position": cfg["profile_legend_position"],
                 "box": cfg["profile_legend_box"],
             },
@@ -215,7 +225,7 @@ def _profile_plan(
         _layer(
             "figure.savefig",
             "savefig",
-            {"fname": output, "dpi": 300},
+            {"fname": output, "dpi": cfg["output_dpi"]},
             len(layers),
         )
     )

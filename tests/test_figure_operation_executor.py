@@ -9,6 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 from unittest.mock import patch
 
+from geodesy_visualization.figure_ops.config import load_figure_plan
 from geodesy_visualization.figure_ops.executor import FigureExecutor
 from geodesy_visualization.figure_ops.model import (
     FigureOperation,
@@ -557,13 +558,13 @@ class FigureOperationExecutorTests(unittest.TestCase):
             operation(
                 "figure.directional_rose",
                 "directional_rose",
-                {"position": "TR", "width": "2c"},
+                {"position": "TR", "width": "2c", "labels": "W,E,S,N", "offset": "3p/4p"},
                 1,
             )
         )
         self.assertEqual(len(figure.calls), 2)
         self.assertEqual(figure.calls[0][1]["map_scale"], "jBR+w50k+f+u")
-        self.assertEqual(figure.calls[1][1]["rose"], "jTR+w2c")
+        self.assertEqual(figure.calls[1][1]["rose"], "jTR+w2c+lW,E,S,N+o3p/4p")
 
     def test_v010_fallback_rejects_untranslatable_embellishment_keys(self) -> None:
         """Fail clearly instead of silently ignoring current-only CFG options."""
@@ -579,13 +580,13 @@ class FigureOperationExecutorTests(unittest.TestCase):
                 )
             )
         with self.assertRaisesRegex(
-            ValueError, r"figure\.directional_rose.*labels.*PyGMT v0\.10"
+            ValueError, r"figure\.directional_rose.*intervals.*PyGMT v0\.10"
         ):
             executor.apply(
                 operation(
                     "figure.directional_rose",
                     "directional_rose",
-                    {"position": "TR", "width": "2c", "labels": "W,E,S,N"},
+                    {"position": "TR", "width": "2c", "intervals": "30/5/1"},
                     1,
                 )
             )
@@ -911,6 +912,34 @@ class FigureOperationExecutorTests(unittest.TestCase):
         self.assertEqual(colorbar["frame"], ["xa1000f1000+lElevation", "y+lm"])
         self.assertNotIn("annot", colorbar)
         self.assertNotIn("tick", colorbar)
+
+    def test_colorbar_cfg_reverse_sets_native_signed_length(self) -> None:
+        """Translate the CFG flag into GMT's length modifier before calling PyGMT."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "dem.grd").touch()
+            cfg = root / "map.cfg"
+            for token, geometry, expected_position in (
+                ("yes", "position = BC\nlength = 8c\nwidth = 0.35c", "JBC+w-8c/0.35c+h"),
+                ("off", "position = BC\nlength = 8c\nwidth = 0.35c", "JBC+w8c/0.35c+h"),
+                ("on", "position = JBC+w-8c/0.35c+o0c/1c", "JBC+w-8c/0.35c+o0c/1c+h"),
+                ("1", "position = BC", "JBC+w-80%+h"),
+            ):
+                with self.subTest(reverse=token, geometry=geometry):
+                    cfg.write_text(
+                        "[figure]\nlayout = publication_sidecar\n"
+                        "[figure.grdimage.dem]\ngrid = dem.grd\ncmap = gray\n"
+                        "[figure.colorbar.dem]\nsource = figure.grdimage.dem\n"
+                        f"{geometry}\nreverse = {token}\n"
+                        "[figure.savefig]\nfname = map.png\n",
+                        encoding="utf-8",
+                    )
+                    figure = RecordingFigure()
+                    FigureExecutor(load_figure_plan(cfg), figure_factory=lambda: figure).execute()
+                    self.assertEqual(
+                        figure.calls[1],
+                        ("colorbar", {"cmap": True, "position": expected_position, "frame": ["xa"]}),
+                    )
 
     def test_colorbar_rejects_a_source_whose_cpt_is_no_longer_active(self) -> None:
         """Avoid silently labelling one raster with a later raster's active CPT."""

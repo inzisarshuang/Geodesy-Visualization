@@ -91,7 +91,9 @@ DEFAULT_REGISTRY = OperationRegistry(
             required=("region", "projection"),
             allowed=(
                 "frame", "title", "transparency", "font_title",
-                "font_annot_primary", "font_label",
+                "font_annot_primary", "font_label", "format_geo_map",
+                "map_frame_type", "map_frame_width", "map_frame_pen", "map_tick_pen",
+                "x_label", "y_label", "x_label_offset", "y_label_offset",
             ),
             floats=("transparency",),
             handler="basemap",
@@ -166,7 +168,7 @@ DEFAULT_REGISTRY = OperationRegistry(
             required=("position", "width"),
             allowed=(
                 "enabled", "kind", "labels", "intervals", "box", "offset",
-                "transparency",
+                "transparency", "label_size",
             ),
             bools=("enabled", "box"),
             floats=("transparency",),

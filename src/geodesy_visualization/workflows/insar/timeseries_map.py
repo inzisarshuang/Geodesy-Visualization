@@ -72,12 +72,15 @@ ALLOWED_KEYS = {
     "basemap_mode", "basemap_tif", "dem_cpt", "dem_bar_min", "dem_bar_max",
     "title_prefix", "title_date_format", "show_panel_title", "show_panel_number",
     "panel_number_style", "coordinate_mode", "longitude_interval", "latitude_interval",
-    "coordinate_format", "show_coordinate_grid", "font_reference_panel_width",
+    "coordinate_format", "show_coordinate_grid", "coordinate_grid_pen", "font_reference_panel_width",
     "font_scale", "font_family", "font_bold", "panel_title_font_size", "panel_number_font_size",
     "coordinate_font_size", "colorbar_annotation_font_size", "colorbar_label_font_size",
     "chunk_rows", "nan_tokens", "colorbar_interval",
     "colorbar_width", "colorbar_height", "colorbar_offset", "colorbar_box",
-    "output_dpi",
+    "output_dpi", "panel_frame_pen", "panel_title_offset", "panel_number_position",
+    "panel_number_offset", "panel_number_fill", "colorbar_anchor",
+    "panel_title_font", "panel_number_font", "coordinate_font",
+    "colorbar_font_annot_primary", "colorbar_font_label",
 }
 ALLOWED_KEYS.update(colorbar_metadata_keys())
 ALLOWED_KEYS.update(font_style_keys("default", include_secondary=True))
@@ -152,6 +155,17 @@ def load_config(config_file: str) -> dict[str, object]:
         "title_date_format": get_optional(raw, "title_date_format", "%Y-%m-%d"),
         "show_panel_title": parse_bool(get_optional(raw, "show_panel_title", ""), True),
         "show_panel_number": parse_bool(get_optional(raw, "show_panel_number", ""), True),
+        "panel_frame_pen": get_optional(raw, "panel_frame_pen", "0.7p,black"),
+        "panel_title_offset": get_optional(raw, "panel_title_offset", "0p/6p"),
+        "panel_number_position": get_optional(raw, "panel_number_position", "TL"),
+        "panel_number_offset": get_optional(raw, "panel_number_offset", "8p/8p"),
+        "panel_number_fill": get_optional(raw, "panel_number_fill", "white@70"),
+        "panel_title_font": get_optional(raw, "panel_title_font"),
+        "panel_number_font": get_optional(raw, "panel_number_font"),
+        "coordinate_font": get_optional(raw, "coordinate_font"),
+        "colorbar_font_annot_primary": get_optional(raw, "colorbar_font_annot_primary"),
+        "colorbar_font_label": get_optional(raw, "colorbar_font_label"),
+        "colorbar_anchor": get_optional(raw, "colorbar_anchor", "JBC"),
         "panel_number_style": get_optional(raw, "panel_number_style", "(1)"),
         "coordinate_mode": parse_choice(
             get_optional(raw, "coordinate_mode", "outer"),
@@ -168,11 +182,12 @@ def load_config(config_file: str) -> dict[str, object]:
         "show_coordinate_grid": parse_bool(
             get_optional(raw, "show_coordinate_grid", ""), False
         ),
+        "coordinate_grid_pen": get_optional(raw, "coordinate_grid_pen", "0.5p,gray45"),
         "font_reference_panel_width": get_optional(
             raw, "font_reference_panel_width", "400p"
         ),
         "font_scale": parse_float(get_optional(raw, "font_scale", ""), 1.0),
-        "font_family": get_optional(raw, "font_family", "TeX Gyre Heros"),
+        "font_family": get_optional(raw, "font_family", "Helvetica"),
         "font_bold": parse_bool(get_optional(raw, "font_bold", ""), False),
         "panel_title_font_size": parse_float(
             get_optional(raw, "panel_title_font_size", ""), 18.0
@@ -209,10 +224,10 @@ def load_config(config_file: str) -> dict[str, object]:
         "defaults": parse_font_style(
             raw,
             "default",
-            "16p,TeX Gyre Heros-Bold",
-            "10p,TeX Gyre Heros",
-            "12p,TeX Gyre Heros",
-            default_secondary="10p,TeX Gyre Heros",
+            "16p,Helvetica-Bold",
+            "10p,Helvetica",
+            "12p,Helvetica",
+            default_secondary="10p,Helvetica",
         ),
     }
     if cfg["rows"] < 1 or cfg["columns"] < 1 or cfg["chunk_rows"] < 1:

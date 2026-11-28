@@ -60,10 +60,12 @@ from geodesy_visualization.io import (
     validate_numeric_range,
 )
 from geodesy_visualization.styles import (
+    DEFORMATION_MAP_STYLE_KEYS,
     colorbar_metadata_keys,
     font_style_keys,
     parse_colorbar_metadata,
-    parse_font_style,
+    parse_deformation_map_style,
+    parse_scoped_font_style,
     resolve_cpt_reference,
 )
 from geodesy_visualization.figure_ops.executor import FigureExecutor
@@ -85,13 +87,13 @@ ALLOWED_KEYS = {
     "input_dir", "output_dir", "projection", "region_west", "region_east", "region_south", "region_north",
     "dem_tif", "optic_tif", "clip_kml", "dem_cpt", "dem_bar_min", "dem_bar_max", "defo_cpt",
     "defo_cpt_reverse", "defo_bar_min", "defo_bar_max", "defo_transparency",
-    "defo_unit", "defo_colorbar_tick_interval", "scatter_style", "scatter_pen", "add_scale", "map_scale",
+    "defo_unit", "scatter_style", "scatter_pen", "add_scale", "map_scale",
     "map_scale_box", "map_scale_height",
     "map_scale_font_annot", "map_scale_font_label", "add_rose", "target_regions",
     "target_region_pen", "target_region_label_font", "target_region_label_offset",
     "target_region_center_style", "output_defo", "defo_basemap_mode",
 }
-ALLOWED_KEYS.update(colorbar_metadata_keys("defo"))
+ALLOWED_KEYS.update(colorbar_metadata_keys("defo") | DEFORMATION_MAP_STYLE_KEYS)
 for _style_prefix in ("default", "map"):
     ALLOWED_KEYS.update(font_style_keys(_style_prefix))
 for _prefix in ("sbas", "psi"):
@@ -274,6 +276,15 @@ def load_config(config_path: str) -> dict:
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     map_mode = parse_choice(get_optional(cfg, "map_mode", "deformation"), ("deformation", "coverage"), "map_mode")
+    map_font_defaults = (
+        ("18p,Helvetica-Bold", "10p,Helvetica-Bold", "14p,Helvetica-Bold")
+        if map_mode == "coverage"
+        else ("28p,Helvetica-Bold", "14p,Helvetica-Bold", "28p,Helvetica-Bold")
+    )
+    map_options = {
+        **parse_deformation_map_style(cfg),
+        "map_style": parse_scoped_font_style(cfg, "map", map_font_defaults),
+    }
     if map_mode == "coverage":
         optic_file = get_required(cfg, "optic_tif")
         output_dir = str(resolve_publication_output_dir(cfg, config_path, "deformation_map"))
@@ -305,17 +316,16 @@ def load_config(config_path: str) -> dict:
             "gnss_style": get_optional(cfg, "gnss_style", "c0.18c"),
             "gnss_pen": get_optional(cfg, "gnss_pen", "0.5p,white"),
             "gnss_labels": parse_bool(get_optional(cfg, "gnss_labels", ""), False),
-            "gnss_label_font": get_optional(cfg, "gnss_label_font", "10p,TeXGyreHeros-Bold,black"),
+            "gnss_label_font": get_optional(cfg, "gnss_label_font", "10p,Helvetica-Bold,black"),
             "gnss_label_offset": parse_float(get_optional(cfg, "gnss_label_offset", ""), 0.001),
             "add_scale": parse_bool(get_optional(cfg, "add_scale", ""), True),
             "map_scale": get_optional(cfg, "map_scale", "JTC+o0c/4c+w5k+f+u"),
             "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p1p+c10p/10p"),
             "map_scale_height": get_optional(cfg, "map_scale_height", "10p"),
-            "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "10p"),
-            "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "10p,TeXGyreHeros-Bold,black"),
+            "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "10p,Helvetica-Bold,black"),
+            "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "10p,Helvetica-Bold,black"),
             "add_rose": parse_bool(get_optional(cfg, "add_rose", ""), True),
-            "default_style": parse_font_style(cfg, "default", "16p,TeXGyreHeros-Bold", "9p,TeXGyreHeros-Bold", "12p,TeXGyreHeros-Bold"),
-            "map_style": parse_font_style(cfg, "map", "18p,TeXGyreHeros-Bold", "10p,TeXGyreHeros-Bold", "14p,TeXGyreHeros-Bold"),
+            **map_options,
             "output_dir": output_dir,
         }
         return conf
@@ -417,9 +427,6 @@ def load_config(config_path: str) -> dict:
         "dem_bar_min": parse_float(get_optional(cfg, "dem_bar_min", ""), 700.0),
         "dem_bar_max": parse_float(get_optional(cfg, "dem_bar_max", ""), 2300.0),
         "defo_transparency": int(parse_float(get_optional(cfg, "defo_transparency", ""), 25.0)),
-        "defo_colorbar_tick_interval": parse_float(
-            get_optional(cfg, "defo_colorbar_tick_interval", ""), 0.0
-        ),
         **parse_colorbar_metadata(
             cfg,
             "defo",
@@ -429,7 +436,7 @@ def load_config(config_path: str) -> dict:
         ),
         "target_regions": parse_target_regions(cfg),
         "target_region_pen": get_optional(cfg, "target_region_pen", "1.5p,black"),
-        "target_region_label_font": get_optional(cfg, "target_region_label_font", "12p,TeX Gyre Heros-Bold,black"),
+        "target_region_label_font": get_optional(cfg, "target_region_label_font", "12p,Helvetica-Bold,black"),
         "target_region_label_offset": parse_float(get_optional(cfg, "target_region_label_offset", ""), 0.008),
         "target_region_center_style": get_optional(cfg, "target_region_center_style", "c0.08c"),
         "scatter_style": get_optional(cfg, "scatter_style", "c0.08c"),
@@ -438,23 +445,10 @@ def load_config(config_path: str) -> dict:
         "map_scale": get_optional(cfg, "map_scale", "JTC+o0c/4c+w10k+f+u"),
         "map_scale_box": get_optional(cfg, "map_scale_box", "F+gWHITE+p2p+c20p/20p"),
         "map_scale_height": get_optional(cfg, "map_scale_height", "20p"),
-        "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "20p"),
-        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,TeX Gyre Heros-Bold,black"),
+        "map_scale_font_annot": get_optional(cfg, "map_scale_font_annot", "20p,Helvetica-Bold,black"),
+        "map_scale_font_label": get_optional(cfg, "map_scale_font_label", "20p,Helvetica-Bold,black"),
         "add_rose": parse_bool(get_optional(cfg, "add_rose", ""), True),
-        "default_style": parse_font_style(
-            cfg,
-            "default",
-            "24p,TeX Gyre Heros-Bold",
-            "12p,TeX Gyre Heros-Bold",
-            "20p,TeX Gyre Heros-Bold",
-        ),
-        "map_style": parse_font_style(
-            cfg,
-            "map",
-            "28p,TeX Gyre Heros-Bold",
-            "14p,TeX Gyre Heros-Bold",
-            "28p,TeX Gyre Heros-Bold",
-        ),
+        **map_options,
         "sbas": sbas_cfg,
         "psi": psi_cfg,
     }

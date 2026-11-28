@@ -90,7 +90,11 @@ def _normalize_options(
     for key, value in raw.items():
         stripped = value.strip()
         try:
-            if key in spec.bool_keys:
+            if key == "box" and (stripped.startswith("+") or stripped[:2] in {"F+", "L+", "T+"}):
+                normalized[key] = stripped
+            elif key == "nan_transparent" and stripped.lower() in (_TRUE_VALUES | _FALSE_VALUES):
+                normalized[key] = _parse_bool(stripped, section, key)
+            elif key in spec.bool_keys:
                 normalized[key] = _parse_bool(stripped, section, key)
             elif key in spec.int_keys:
                 normalized[key] = int(stripped)

@@ -19,6 +19,8 @@ geodesy_visualization.backends.pygmt
     地图绘制:
         ``PyGMTPlotter.draw_geo_basemap``:
             绘制地理坐标边框、刻度和标题。
+        ``PyGMTPlotter.draw_geo_grid`` / ``PyGMTPlotter.add_geo_axis_labels``:
+            独立叠加经纬格网和可选轴名。
         ``PyGMTPlotter.draw_dem`` / ``PyGMTPlotter.draw_optic``:
             绘制 DEM 阴影或光学影像底图。
         ``PyGMTPlotter.draw_defo_grd`` / ``PyGMTPlotter.draw_defo_scatter``:
@@ -41,6 +43,7 @@ geodesy_visualization.backends.pygmt
     谭逸伦，SIGM@3D Laboratory，中南大学地球科学与信息物理学院。
 """
 
+from contextlib import nullcontext
 from hashlib import sha256
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
@@ -54,11 +57,21 @@ from ..io import gdal_translate, replace_dataset, temporary_path
 
 # 默认基础绘图参数
 DEFAULTS = dict(
-    FONT_TITLE="20p,TeX Gyre Heros-Bold",
-    FONT_ANNOT_PRIMARY="12p,TeX Gyre Heros-Bold",
-    FONT_ANNOT_SECONDARY="12p,TeX Gyre Heros-Bold",
-    FONT_LABEL="20p,TeX Gyre Heros-Bold",
+    FONT_TITLE="20p,Helvetica-Bold",
+    FONT_ANNOT_PRIMARY="12p,Helvetica-Bold",
+    FONT_ANNOT_SECONDARY="12p,Helvetica-Bold",
+    FONT_LABEL="20p,Helvetica-Bold",
 )
+
+
+def _map_intervals(
+    region: Sequence[float], longitude: float | None, latitude: float | None
+) -> tuple[float, float]:
+    """Use explicit geographic spacing or divide each map extent into thirds."""
+    return (
+        longitude or (region[1] - region[0]) / 3,
+        latitude or (region[3] - region[2]) / 3,
+    )
 
 
 class PyGMTPlotter:
@@ -133,7 +146,7 @@ class PyGMTPlotter:
         参数 (Parameters)
         ----------
         **kwargs :
-            形如 FONT_TITLE="24p,TeX Gyre Heros-Bold" 等 GMT 配置项键值。
+            形如 FONT_TITLE="24p,Helvetica-Bold" 等 GMT 配置项键值。
 
         返回 (Returns)
         -------
@@ -206,6 +219,20 @@ class PyGMTPlotter:
         region: List[float],
         projection: str,
         title: str,
+        x_label: str = "",
+        y_label: str = "",
+        label_font: str | None = None,
+        *,
+        frame_type: str = "fancy",
+        frame_width: str = "6p",
+        frame_pen: str = "3p",
+        tick_pen: str = "3p",
+        coordinate_format: str = "ddd:mm:ss",
+        longitude_interval: float | None = None,
+        latitude_interval: float | None = None,
+        show_grid: bool = True,
+        x_label_offset: str = "0c/-1c",
+        y_label_offset: str = "-2.3c/0c",
     ) -> "PyGMTPlotter":
         """
         绘制底图框（花式边框 + 三等分轴注 + 标题）。
@@ -219,29 +246,71 @@ class PyGMTPlotter:
             投影字符串，例如 "M8i"（墨卡托，宽 8 英寸）。
         title : str
             图幅标题，将显示在图上方。
+        x_label, y_label : str, optional
+            横轴与纵轴名称，留空隐藏相应轴名。
+        label_font : str, optional
+            横轴与纵轴名称的 GMT 字体规格。
 
         返回 (Returns)
         -------
         None
         """
-        factor = 3
         figure = self._require_figure()
-        x_stride = round((region[1] - region[0]) / factor, 4)
-        y_stride = round((region[3] - region[2]) / factor, 4)
-        x_anno = f"a{x_stride}fg"
-        y_anno = f"a{y_stride}fg"
+        x_stride, y_stride = _map_intervals(region, longitude_interval, latitude_interval)
+        suffix = "fg" if show_grid else "f"
         with pygmt.config(
-            MAP_FRAME_TYPE="fancy",
-            MAP_FRAME_WIDTH="6p",
-            FONT_ANNOT="18p,TeX Gyre Heros-Bold",
-            MAP_FRAME_PEN="3p",
-            MAP_TICK_PEN="3p",
-            FORMAT_GEO_MAP="ddd:mm:ss",
+            MAP_FRAME_TYPE=frame_type,
+            MAP_FRAME_WIDTH=frame_width,
+            MAP_FRAME_PEN=frame_pen,
+            MAP_TICK_PEN=tick_pen,
+            FORMAT_GEO_MAP=coordinate_format,
         ):
             figure.basemap(
                 region=region,
                 projection=projection,
-                frame=[f"x{x_anno}", f"y{y_anno}", f"+t{title}"],
+                frame=[f"xa{x_stride:g}{suffix}", f"ya{y_stride:g}{suffix}", f"+t{title}"],
+            )
+
+        self.add_geo_axis_labels(x_label, y_label, label_font, x_label_offset, y_label_offset)
+        return self
+
+    def draw_geo_grid(
+        self,
+        region: Sequence[float],
+        projection: str,
+        longitude_interval: float | None,
+        latitude_interval: float | None,
+        pen: str,
+    ) -> "PyGMTPlotter":
+        """Overlay only geographic gridlines, leaving the existing border and labels intact."""
+        x_stride, y_stride = _map_intervals(region, longitude_interval, latitude_interval)
+        with pygmt.config(MAP_GRID_PEN_PRIMARY=pen):
+            self._require_figure().basemap(
+                region=region,
+                projection=projection,
+                frame=["+n", f"xg{x_stride:g}", f"yg{y_stride:g}"],
+            )
+        return self
+
+    def add_geo_axis_labels(
+        self,
+        x_label: str = "",
+        y_label: str = "",
+        label_font: str | None = None,
+        x_label_offset: str = "0c/-1c",
+        y_label_offset: str = "-2.3c/0c",
+    ) -> "PyGMTPlotter":
+        """Draw optional names outside the geographic frame, where GMT skips +l."""
+        figure = self._require_figure()
+        if x_label:
+            figure.text(
+                position="BC", text=x_label, font=label_font, justify="TC",
+                offset=x_label_offset, no_clip=True,
+            )
+        if y_label:
+            figure.text(
+                position="ML", text=y_label, font=label_font, justify="BC",
+                angle=90, offset=y_label_offset, no_clip=True,
             )
 
         return self
@@ -307,19 +376,21 @@ class PyGMTPlotter:
                 pygmt.grdgradient(grid=str(dem_grid), outgrid=str(temporary_gradient), azimuth=0)
                 replace_dataset(temporary_gradient, gradient_grid)
 
-        pygmt.makecpt(
-            cmap=cpt,
-            series=[bar_min, bar_max],
-            background=True,
-            reverse=True,
-        )
-        figure.grdimage(
-            grid=str(dem_grid),
-            region=region,
-            projection=projection,
-            cmap=True,
-            shading=str(gradient_grid),
-        )
+        with temporary_path(self.cache_dir, ".cpt") as dem_palette:
+            pygmt.makecpt(
+                cmap=cpt,
+                series=[bar_min, bar_max],
+                background=True,
+                reverse=True,
+                output=str(dem_palette),
+            )
+            figure.grdimage(
+                grid=str(dem_grid),
+                region=region,
+                projection=projection,
+                cmap=str(dem_palette),
+                shading=str(gradient_grid),
+            )
 
         return self
 
@@ -514,6 +585,11 @@ class PyGMTPlotter:
         label: str = "Deformation",
         unit: str = "m/yr",
         tick_interval: float | None = None,
+        *,
+        position: str = "JBC+o0c/4c+w12c/0.6c+h",
+        box: str = "F+gWHITE+p2p+c20p/20p",
+        font_annot_primary: str = "20p",
+        font_label: str = "",
     ) -> "PyGMTPlotter":
         """
         添加颜色条（底部居中 + 下移；白底 + 边框 + 内边距）。
@@ -528,16 +604,20 @@ class PyGMTPlotter:
         None
         """
         figure = self._require_figure()
-        with pygmt.config(
-            FONT_ANNOT_PRIMARY="20p",
-            FONT_ANNOT_SECONDARY="24p, TeX Gyre Heros-Bold",
-        ):
-            frame = [f"xa{tick_interval:g}" if tick_interval else "xa", f"y+l{unit}"]
+        fonts = {"FONT_ANNOT_PRIMARY": font_annot_primary}
+        if font_label:
+            fonts["FONT_LABEL"] = font_label
+        with pygmt.config(**fonts):
+            frame = [f"xa{tick_interval:g}" if tick_interval else "xa"]
+            if label:
+                frame[0] += f"+l{label}"
+            if unit:
+                frame.append(f"y+l{unit}")
             figure.colorbar(
                 cmap=True,
-                position="JBC+o0c/4c+w12c/0.6c+h",
-                frame=[frame[0] + f"+l{label}", frame[1]],
-                box="F+gWHITE+p2p+c20p/20p",
+                position=position,
+                frame=frame,
+                box=box or None,
             )
 
         return self
@@ -550,7 +630,7 @@ class PyGMTPlotter:
         box: str = "F+gWHITE+p2p+c20p/20p",
         scale_height: str = "20p",
         font_annot: str = "20p",
-        font_label: str = "20p,TeX Gyre Heros-Bold,black",
+        font_label: str = "20p,Helvetica-Bold,black",
     ) -> "PyGMTPlotter":
         """
         添加比例尺（上方居中 + 上移；白底 + 边框 + 内边距）。
@@ -586,6 +666,10 @@ class PyGMTPlotter:
         self,
         region: List[float],
         projection: str,
+        label_size: str = "",
+        *,
+        rose: str = "JMR+jCM+o10c/0c+w5c+l+f1",
+        box: str = "F+gwhite+p2p+c1.5c",
     ) -> "PyGMTPlotter":
         """
         添加玫瑰图/指北针（右侧居中 + 右移；白底 + 边框 + 内边距）。
@@ -597,18 +681,23 @@ class PyGMTPlotter:
             地图区域范围 [xmin, xmax, ymin, ymax]。
         projection : str
             投影字符串，例如 "M8i"。
+        label_size : str, optional
+            方位字母字号，例如 "14p"；留空沿用地图标题字号。
 
         返回 (Returns)
         -------
         None
         """
         figure = self._require_figure()
-        figure.basemap(
-            region=region,
-            projection=projection,
-            rose="JMR+jCM+o10c/0c+w5c+l+f1",
-            box="F+gwhite+p2p+c1.5c",
-        )
+        # GMT uses the title size for the compass directions and supplies their font face.
+        label_style = pygmt.config(FONT_TITLE=label_size) if label_size else nullcontext()
+        with label_style:
+            figure.basemap(
+                region=region,
+                projection=projection,
+                rose=rose,
+                box=box or None,
+            )
 
         return self
 
@@ -616,7 +705,7 @@ class PyGMTPlotter:
         self,
         tracks: Dict[str, Sequence[Sequence[float]]],
         line_pen: str = "2p,black",
-        start_label_font: str = "20p,TeX Gyre Heros-Bold",
+        start_label_font: str = "20p,Helvetica-Bold",
         end_label_font: str | None = None,
         start_justify: str = "BR",
         end_justify: str = "BL",
@@ -633,7 +722,7 @@ class PyGMTPlotter:
         line_pen : str, optional
             轨迹线型（GMT pen 字符串），默认 "2p,black"。
         start_label_font : str, optional
-            起点注记字体（默认 "20p,TeX Gyre Heros-Bold"）。
+            起点注记字体（默认 "20p,Helvetica-Bold"）。
         end_label_font : str or None, optional
             终点注记字体；为 None 时与起点相同。
         start_justify : str, optional
@@ -713,6 +802,10 @@ class PyGMTPlotter:
         y_label: str = "Deformation (m)",
         padding: float = 0.1,
         projection: str = "X16c/10c",
+        *,
+        x_frame: str = "af",
+        y_frame: str = "af",
+        frame_pen: str = "",
     )-> "PyGMTPlotter":
         """
         初始化剖面坐标轴：根据单个或多个剖面数据自动计算绘图范围，并绘制坐标框架。
@@ -756,11 +849,13 @@ class PyGMTPlotter:
         y_min -= y_gap; y_max += y_gap
 
         figure = self._require_figure()
-        figure.basemap(
-            region=[x_min, x_max, y_min, y_max],
-            projection=projection,
-            frame=[f"xaf+l{x_label}", f"yaf+l{y_label}", f"+t{title}"]
-        )
+        frame_style = pygmt.config(MAP_FRAME_PEN=frame_pen) if frame_pen else nullcontext()
+        with frame_style:
+            figure.basemap(
+                region=[x_min, x_max, y_min, y_max],
+                projection=projection,
+                frame=[f"x{x_frame}+l{x_label}", f"y{y_frame}+l{y_label}", f"+t{title}"],
+            )
         return self
 
 
@@ -825,6 +920,7 @@ class PyGMTPlotter:
     self,
     position: str = "JTR+o0.5c/-1.2c",
     box: str = "+gwhite+p1.5p",
+    font: str = "",
     ) -> "PyGMTPlotter":
         """
         添加剖面图例。
@@ -836,7 +932,9 @@ class PyGMTPlotter:
         返回:
         self（支持链式调用）
         """
-        self._require_figure().legend(position=position, box=box)
+        font_style = pygmt.config(FONT_ANNOT_PRIMARY=font) if font else nullcontext()
+        with font_style:
+            self._require_figure().legend(position=position, box=box or None)
         return self
 
 

@@ -34,6 +34,7 @@ _KEYS = {
     "project",
     "processing_root",
     "baseline_manifest",
+    "output_file",
     "output",
     "title",
     "dpi",
@@ -142,12 +143,18 @@ def _within(path: Path, root: Path, label: str) -> Path:
     return resolved
 
 
-def _unknown(section: configparser.SectionProxy, source: Path) -> None:
-    """Reject unsupported keys in one defaults or case section."""
+def _section_values(
+    section: configparser.SectionProxy, source: Path
+) -> dict[str, str]:
+    """Validate and normalize keys before merging defaults and case values."""
 
     unknown = sorted(set(section) - _KEYS)
     if unknown:
         raise ValueError(f"{source}: unknown key in [{section.name}]: {unknown[0]}")
+    values = {key: value.strip() for key, value in section.items()}
+    if "output" in values:
+        values.setdefault("output_file", values.pop("output"))
+    return values
 
 
 def _positive_integer(value: str, key: str, source: Path) -> int:
@@ -289,10 +296,7 @@ def load_baseline_plot_config(path: Path) -> tuple[BaselinePlotCase, ...]:
     ).resolve(strict=True)
     defaults = dict(_DEFAULTS)
     if parser.has_section("defaults"):
-        _unknown(parser["defaults"], source)
-        defaults.update(
-            (key, value.strip()) for key, value in parser["defaults"].items()
-        )
+        defaults.update(_section_values(parser["defaults"], source))
     cases: list[BaselinePlotCase] = []
     for section_name in parser.sections():
         if section_name in {"project", "defaults"}:
@@ -303,13 +307,12 @@ def load_baseline_plot_config(path: Path) -> tuple[BaselinePlotCase, ...]:
         if not _CASE_NAME.fullmatch(name):
             raise ValueError(f"{source}: unsafe or empty case name: {name!r}")
         section = parser[section_name]
-        _unknown(section, source)
         values = dict(defaults)
-        values.update((key, value.strip()) for key, value in section.items())
+        values.update(_section_values(section, source))
         missing = [key for key in ("baseline_manifest",) if not values.get(key)]
         has_layout = bool(values.get("project") and values.get("processing_root"))
-        if not values.get("output") and not has_layout:
-            missing.append("output or project/processing_root")
+        if not values.get("output_file") and not has_layout:
+            missing.append("output_file or project/processing_root")
         if missing:
             raise ValueError(
                 f"{source}: [{section_name}] missing keys: {', '.join(missing)}"
@@ -322,8 +325,8 @@ def load_baseline_plot_config(path: Path) -> tuple[BaselinePlotCase, ...]:
         )
         if not manifest.is_file() or manifest.stat().st_size == 0:
             raise FileNotFoundError(f"baseline manifest not found or empty: {manifest}")
-        if values.get("output"):
-            output_value = Path(values["output"]).expanduser()
+        if values.get("output_file"):
+            output_value = Path(values["output_file"]).expanduser()
             output = _within(
                 output_value if output_value.is_absolute() else root / output_value,
                 root,
